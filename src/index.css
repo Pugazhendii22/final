@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media screen {
+  #print-label-root {
+    position: fixed;
+    top: -9999px;
+    left: -9999px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+@media print {
+  body * { visibility: hidden; }
+  #print-label-root, #print-label-root * { visibility: visible; }
+  #print-label-root { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100mm;
+    height: 50mm;
+    background: white;
+  }
+  @page { size: 100mm 50mm; margin: 0; }
+}
