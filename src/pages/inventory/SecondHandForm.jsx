@@ -295,10 +295,34 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
 
   const handlePrintLabel = () => {
     if (labelAssigned && assignedLabelNumber) {
+      // Print with assigned label number
       printLabel({
-        labelNumber: assignedLabelNumber,
         labelType: 'second_hand',
-        data: formData
+        labelNumber: assignedLabelNumber,
+        data: {
+          brand: formData.brand,
+          model: formData.model,
+          ram: formData.ram,
+          rom: formData.rom,
+          salePrice: formData.salePrice,
+          imei1: formData.imei1,
+          grade: formData.condition,
+        }
+      });
+    } else {
+      // Print without assigned label — use IMEI1 as barcode
+      printLabel({
+        labelType: 'second_hand',
+        labelNumber: null,
+        data: {
+          brand: formData.brand,
+          model: formData.model,
+          ram: formData.ram,
+          rom: formData.rom,
+          salePrice: formData.salePrice,
+          imei1: formData.imei1,
+          grade: formData.condition,
+        }
       });
     }
   };
@@ -580,15 +604,25 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
           
           {labelAssigned ? (
             <button type="button" disabled className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold cursor-not-allowed">
-              Label Assigned: #{assignedLabelNumber} ✓
+              Label #{assignedLabelNumber} ✓
             </button>
           ) : (
-            <button type="button" onClick={handleAssignLabel} disabled={!localId || assigning} className="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 hover:bg-slate-800">
+            <button
+              type="button"
+              onClick={handleAssignLabel}
+              disabled={!localId || assigning}
+              className="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
+            >
               {assigning ? 'Assigning...' : 'Assign Label'}
             </button>
           )}
           
-          <button type="button" onClick={handlePrintLabel} disabled={!labelAssigned} className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 hover:bg-purple-700">
+          <button
+            type="button"
+            onClick={handlePrintLabel}
+            disabled={!localId}
+            className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700"
+          >
             Print Label
           </button>
           

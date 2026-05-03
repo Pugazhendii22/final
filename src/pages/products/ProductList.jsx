@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import ProductForm from './ProductForm';
+import { useAuth } from '../../context/AuthContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const ProductList = () => {
+  const { userRole } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchProducts = async () => {
     try {
@@ -41,6 +46,17 @@ const ProductList = () => {
     const docRef = await addDoc(collection(db, 'products'), data);
     fetchProducts();
     return docRef.id;
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'products', deleteTarget.id));
+      setProducts(prev => prev.filter(p => p.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   const filteredProducts = products.filter(p => {
@@ -133,6 +149,15 @@ const ProductList = () => {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Link to={`/products/${p.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View</Link>
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={() => setDeleteTarget(p)}
+                        title="Delete product"
+                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -158,6 +183,14 @@ const ProductList = () => {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        deleting={deleting}
+        title="Delete Product"
+        message="Are you sure you want to delete this product? This action cannot be undone."
+      />
     </Layout>
   );
 };

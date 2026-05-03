@@ -14,15 +14,38 @@
 }
 
 @media print {
-  body * { visibility: hidden; }
-  #print-label-root, #print-label-root * { visibility: visible; }
-  #print-label-root { 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    width: 100mm;
-    height: 50mm;
-    background: white;
+
+  /* Hide entire page by default */
+  body>* {
+    display: none !important;
   }
-  @page { size: 100mm 50mm; margin: 0; }
+
+  /* Label printing — 100x50mm */
+  body>#print-label-root {
+    display: block !important;
+    position: static !important;
+    opacity: 1 !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: auto !important;
+  }
+
+  /* Report printing — A4 */
+  body>#report-print-overlay {
+    display: block !important;
+    position: static !important;
+  }
+
+  /* Invoice printing — A4 */
+  body>#invoice-print-overlay {
+    display: block !important;
+    position: static !important;
+  }
+
+  /* Label size override only when printing labels */
+  body>#print-label-root~* {
+    display: none !important;
+  }
 }
+
+/* Page size is set per-overlay via inline <style> tags injected at print time */

@@ -15,6 +15,7 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
       date: new Date().toISOString().split('T')[0],
       customerName: prefill.customerName || '',
       customerPhone: prefill.customerPhone || '',
+      customerAddress: prefill.customerAddress || '',
       items: prefill.items ? prefill.items.map(item => ({
         type: 'Service',
         itemId: 'service',
@@ -73,7 +74,8 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
     setFormData(prev => ({ 
       ...prev, 
       customerName: c.name || '', 
-      customerPhone: c.phone || '' 
+      customerPhone: c.phone || '',
+      customerAddress: c.address || c.customerAddress || ''
     }));
   };
 

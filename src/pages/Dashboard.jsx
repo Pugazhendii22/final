@@ -44,6 +44,13 @@ const Dashboard = () => {
   const [myDueTodayOrders, setMyDueTodayOrders] = useState([]);
   const [myPendingOrdersList, setMyPendingOrdersList] = useState([]);
 
+  // Task-specific states
+  const [adminTaskStats, setAdminTaskStats] = useState({ pendingToday: 0, overdue: 0, completedToday: 0 });
+  const [staffTaskStats, setStaffTaskStats] = useState({ pending: 0, overdue: 0, todayList: [] });
+
+  // Rating-specific states
+  const [ratingStats, setRatingStats] = useState({ average: 0, count: 0, breakdown: [0,0,0,0,0,0], recent: [] });
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -125,6 +132,70 @@ const Dashboard = () => {
         let enqCount = 0;
         enqSnap.forEach(d => { if (d.data().status === 'Open') enqCount++; });
         setOpenEnquiries(enqCount);
+
+        // Fetch Tasks Data
+        const tasksSnap = await getDocs(collection(db, 'tasks'));
+        
+        if (userRole?.toLowerCase() === 'admin') {
+          let pToday = 0, oDue = 0, cToday = 0;
+          tasksSnap.forEach(d => {
+            const t = d.data();
+            const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+            if (t.status === 'completed' && t.completedAt) {
+              const compDate = t.completedAt?.toDate ? t.completedAt.toDate() : new Date(t.completedAt);
+              if (compDate >= startToday && compDate < endToday) cToday++;
+            } else if (t.status === 'pending') {
+              if (due >= startToday && due < endToday) pToday++;
+              if (due < now) oDue++;
+            }
+          });
+          setAdminTaskStats({ pendingToday: pToday, overdue: oDue, completedToday: cToday });
+        } else if (userRole?.toLowerCase() === 'staff') {
+          let sPend = 0, sOver = 0;
+          const sList = [];
+          tasksSnap.forEach(d => {
+            const t = d.data();
+            if (t.assignedTo === currentUser.uid && t.status === 'pending') {
+              sPend++;
+              const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+              if (due < now) sOver++;
+              if (due >= startToday && due < endToday) sList.push({ id: d.id, ...t, due });
+            }
+          });
+          setStaffTaskStats({ pending: sPend, overdue: sOver, todayList: sList.slice(0, 3) });
+        }
+
+        // Fetch Ratings Data (Admin only)
+        if (userRole?.toLowerCase() === 'admin') {
+          const ratingsSnap = await getDocs(collection(db, 'ratings'));
+          let sum = 0, count = 0;
+          let bd = [0, 0, 0, 0, 0, 0]; // index matches rating (1-5)
+          let allRatings = [];
+          
+          ratingsSnap.forEach(d => {
+            const r = d.data();
+            if (r.status === 'submitted' && r.rating) {
+              sum += r.rating;
+              count++;
+              bd[r.rating] = (bd[r.rating] || 0) + 1;
+              allRatings.push({ id: d.id, ...r });
+            }
+          });
+          
+          allRatings.sort((a, b) => {
+            const da = a.submittedAt?.toDate ? a.submittedAt.toDate() : new Date(a.submittedAt);
+            const db = b.submittedAt?.toDate ? b.submittedAt.toDate() : new Date(b.submittedAt);
+            return db - da;
+          });
+          
+          setRatingStats({
+            average: count > 0 ? (sum / count).toFixed(1) : 0,
+            count: count,
+            breakdown: bd,
+            recent: allRatings.slice(0, 5)
+          });
+        }
+
       } catch (err) {
         console.error(err);
       } finally {
@@ -151,6 +222,16 @@ const Dashboard = () => {
 
   return (
     <Layout title="Dashboard">
+      {userRole?.toLowerCase() === 'staff' && staffTaskStats.overdue > 0 && (
+        <div 
+          onClick={() => navigate('/tasks')}
+          className="bg-red-600 text-white p-3 mb-6 rounded-lg shadow-md cursor-pointer hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-medium"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          You have {staffTaskStats.overdue} overdue task{staffTaskStats.overdue > 1 ? 's' : ''}!
+        </div>
+      )}
+
       {lowStockCount > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg shadow-sm">
           <div className="flex items-center gap-3">
@@ -293,6 +374,127 @@ const Dashboard = () => {
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Admin Task Management Overview */}
+      {userRole === 'admin' && (adminTaskStats.pendingToday > 0 || adminTaskStats.overdue > 0 || adminTaskStats.completedToday > 0) && (
+        <div onClick={() => navigate('/admin/tasks')} className="bg-white border-l-4 border-indigo-500 p-4 mb-6 rounded-r-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div>
+              <p className="text-sm font-semibold text-indigo-700">Task Overview</p>
+              <p className="text-sm text-gray-500">Staff tasks progress today.</p>
+            </div>
+            <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+          </div>
+          <div className="flex gap-4 sm:gap-8 mt-3 border-t border-gray-100 pt-3">
+            <div>
+              <span className="block text-2xl font-bold text-gray-800">{adminTaskStats.pendingToday}</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Pending Today</span>
+            </div>
+            <div>
+              <span className="block text-2xl font-bold text-red-600">{adminTaskStats.overdue}</span>
+              <span className="text-xs text-red-500 uppercase tracking-wider font-semibold">Overdue</span>
+            </div>
+            <div>
+              <span className="block text-2xl font-bold text-green-600">{adminTaskStats.completedToday}</span>
+              <span className="text-xs text-green-500 uppercase tracking-wider font-semibold">Completed Today</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Customer Ratings */}
+      {userRole === 'admin' && ratingStats.count > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-gray-900">Customer Ratings</h2>
+            <Link to="/admin/ratings" className="text-sm text-indigo-600 font-medium hover:underline">View All</Link>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Score & Breakdown */}
+            <div className="md:col-span-1 space-y-6">
+              <div className="text-center md:text-left">
+                <p className="text-5xl font-black text-gray-900 mb-2">
+                  {ratingStats.average} <span className="text-2xl text-yellow-400">⭐</span>
+                </p>
+                <p className="text-sm text-gray-500 font-medium">Based on {ratingStats.count} ratings</p>
+              </div>
+              
+              <div className="space-y-2">
+                {[5, 4, 3, 2, 1].map(star => {
+                  const count = ratingStats.breakdown[star] || 0;
+                  const percentage = ratingStats.count > 0 ? (count / ratingStats.count) * 100 : 0;
+                  return (
+                    <div key={star} className="flex items-center text-sm">
+                      <span className="w-12 text-gray-600 font-medium">{star} star</span>
+                      <div className="flex-1 mx-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${star >= 4 ? 'bg-green-500' : star === 3 ? 'bg-yellow-400' : 'bg-red-500'}`} 
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <span className="w-8 text-right text-gray-500 text-xs">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Recent Ratings */}
+            <div className="md:col-span-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">Recent Reviews</h3>
+              <div className="space-y-4">
+                {ratingStats.recent.map(review => (
+                  <div key={review.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-start mb-1">
+                      <div>
+                        <span className="font-semibold text-gray-900">{review.customerName}</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          {review.submittedAt?.toDate ? review.submittedAt.toDate().toLocaleDateString() : new Date(review.submittedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex text-yellow-400 text-xs">
+                        {Array.from({length: 5}).map((_, i) => (
+                          <span key={i}>{i < review.rating ? '★' : '☆'}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {review.comment && <p className="text-sm text-gray-600 italic mt-1 line-clamp-2">"{review.comment}"</p>}
+                    <p className="text-xs text-gray-400 mt-2">
+                      Serviced by: <span className="font-medium text-gray-500">{review.technicianName}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff My Tasks Card */}
+      {userRole?.toLowerCase() === 'staff' && (staffTaskStats.pending > 0 || staffTaskStats.overdue > 0) && (
+        <div className="bg-white border-l-4 border-indigo-500 p-4 mb-6 rounded-r-lg shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4 cursor-pointer" onClick={() => navigate('/tasks')}>
+            <div>
+              <p className="text-sm font-semibold text-indigo-700">My Tasks</p>
+              <div className="flex gap-3 mt-1">
+                <span className="text-xs font-medium text-gray-600">{staffTaskStats.pending} pending</span>
+                {staffTaskStats.overdue > 0 && <span className="text-xs font-medium text-red-600">{staffTaskStats.overdue} overdue</span>}
+              </div>
+            </div>
+            <Link to="/tasks" className="text-sm text-indigo-600 font-medium hover:underline">View All</Link>
+          </div>
+          <div className="grid gap-2">
+            {staffTaskStats.todayList.map(task => (
+              <div key={task.id} className="text-left w-full rounded-lg border border-gray-100 bg-gray-50 p-3 flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-800 truncate pr-4">{task.title}</span>
+                <span className={`text-xs px-2 py-0.5 rounded capitalize whitespace-nowrap ${task.priority === 'high' ? 'bg-red-100 text-red-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{task.priority}</span>
+              </div>
+            ))}
+            {staffTaskStats.todayList.length === 0 && <p className="text-sm text-gray-500 italic">No tasks explicitly due today.</p>}
           </div>
         </div>
       )}

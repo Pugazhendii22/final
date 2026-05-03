@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/firebase';
 import { getLabelNumber } from '../../utils/getLabelNumber';
 import { printLabel } from '../../utils/printLabel.jsx';
+import { generateInvoiceHTML } from '../../utils/generateInvoiceHTML';
 import Layout from '../../components/common/Layout';
 
 const SalesView = () => {
@@ -11,22 +12,64 @@ const SalesView = () => {
   const navigate = useNavigate();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [labelEntry, setLabelEntry] = useState(null);
   const [showLabelDialog, setShowLabelDialog] = useState(false);
   const [labelInput, setLabelInput] = useState('');
   const [assigningLabel, setAssigningLabel] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'sales', id));
+        const [docSnap, labelSnap] = await Promise.all([
+          getDoc(doc(db, 'sales', id)),
+          getDocs(query(collection(db, 'label_registry'), where('referenceId', '==', id), where('labelType', '==', 'sale'))),
+        ]);
         if (docSnap.exists()) setSale({ id: docSnap.id, ...docSnap.data() });
-      } catch (err) { console.error(err); } finally { setLoading(false); }
+        if (!labelSnap.empty) setLabelEntry(labelSnap.docs[0].data());
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+        setDataLoaded(true);
+      }
     };
-    fetch();
-    getDocs(query(collection(db, 'label_registry'), where('referenceId', '==', id), where('labelType', '==', 'sale')))
-      .then(snap => { if (!snap.empty) setLabelEntry(snap.docs[0].data()); });
+    fetchData();
   }, [id]);
+
+  const handlePrintInvoice = async () => {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      // Re-fetch fresh data from Firestore before printing
+      const freshSnap = await getDoc(doc(db, 'sales', id));
+      const freshData = freshSnap.exists() ? { id: freshSnap.id, ...freshSnap.data() } : sale;
+
+      const invoiceHTML = generateInvoiceHTML(freshData);
+
+      const existing = document.getElementById('invoice-print-overlay');
+      if (existing) existing.remove();
+
+      const printDiv = document.createElement('div');
+      printDiv.id = 'invoice-print-overlay';
+      printDiv.style.cssText = 'display:none;';
+      printDiv.innerHTML = invoiceHTML;
+      document.body.appendChild(printDiv);
+      printDiv.style.display = 'block';
+
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          printDiv.remove();
+          setPrinting(false);
+        }, 1000);
+      }, 800);
+    } catch (err) {
+      console.error('Print error:', err);
+      setPrinting(false);
+    }
+  };
 
   const openLabelDialog = async () => {
     const next = await getLabelNumber();
@@ -79,6 +122,16 @@ const SalesView = () => {
             <h1 className="text-3xl font-bold text-gray-900">Invoice: {sale.invoiceNumber}</h1>
           </div>
           <div className="flex items-center space-x-3">
+            <button
+              onClick={handlePrintInvoice}
+              disabled={!dataLoaded || printing}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              {printing ? 'Preparing...' : !dataLoaded ? 'Loading...' : 'Print Invoice'}
+            </button>
             {labelEntry ? (
               <>
                 <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-800 border border-green-300">

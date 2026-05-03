@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import SecondHandForm from './SecondHandForm';
+import { useAuth } from '../../context/AuthContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const Modal = ({ title, onClose, children }) => (
   <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-0 sm:p-4">
@@ -21,10 +23,13 @@ const Modal = ({ title, onClose, children }) => (
 );
 
 const SecondHandList = () => {
+  const { userRole } = useAuth();
   const [mobiles, setMobiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchMobiles = async () => {
     try {
@@ -48,6 +53,25 @@ const SecondHandList = () => {
     newMobile.createdAt = new Date().toISOString();
     const docRef = await addDoc(collection(db, 'second_hand_mobiles'), newMobile);
     fetchMobiles(); return docRef.id;
+  };
+
+  const handleDeleteClick = (m) => {
+    if (m.status === 'sold') {
+      alert('Cannot delete a sold mobile.');
+      return;
+    }
+    setDeleteTarget(m);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'second_hand_mobiles', deleteTarget.id));
+      setMobiles(prev => prev.filter(m => m.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   const filteredMobiles = mobiles.filter(m => {
@@ -114,6 +138,15 @@ const SecondHandList = () => {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Link to={`/inventory/second-hand/${m.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View / Edit</Link>
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={() => handleDeleteClick(m)}
+                        title={m.status === 'sold' ? 'Cannot delete sold mobile' : 'Delete'}
+                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -130,6 +163,14 @@ const SecondHandList = () => {
           <SecondHandForm onSave={handleSaveMobile} onCancel={() => setShowModal(false)} />
         </Modal>
       )}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        deleting={deleting}
+        title="Delete Mobile"
+        message="Are you sure you want to delete this mobile? This action cannot be undone."
+      />
     </Layout>
   );
 };

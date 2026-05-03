@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import CustomerForm from './CustomerForm';
+import { useAuth } from '../../context/AuthContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const Modal = ({ title, onClose, children }) => (
   <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-0 sm:p-4">
@@ -21,10 +23,13 @@ const Modal = ({ title, onClose, children }) => (
 );
 
 const CustomerList = () => {
+  const { userRole } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -42,6 +47,17 @@ const CustomerList = () => {
     await addDoc(collection(db, 'customers'), { ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     setShowModal(false);
     fetchCustomers();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'customers', deleteTarget.id));
+      setCustomers(prev => prev.filter(c => c.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   const filteredCustomers = customers.filter(c => {
@@ -97,6 +113,15 @@ const CustomerList = () => {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Link to={`/customers/${c.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View / Edit</Link>
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={() => setDeleteTarget(c)}
+                        title="Delete customer"
+                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -113,6 +138,14 @@ const CustomerList = () => {
           <CustomerForm onSave={handleSaveCustomer} onCancel={() => setShowModal(false)} />
         </Modal>
       )}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        deleting={deleting}
+        title="Delete Customer"
+        message="Deleting this customer will not delete their orders or service history. This action cannot be undone."
+      />
     </Layout>
   );
 };

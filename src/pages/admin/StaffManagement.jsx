@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db, secondaryAuth } from '../../firebase/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const StaffManagement = () => {
   const { currentUser, userRole } = useAuth();
@@ -14,6 +15,8 @@ const StaffManagement = () => {
   const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'staff' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchStaff = async () => {
     try {
@@ -47,6 +50,17 @@ const StaffManagement = () => {
       setNewStaff({ name: '', email: '', password: '', role: 'staff' });
       fetchStaff();
     } catch (err) { setError(err.message); } finally { setSubmitting(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'users', deleteTarget.uid));
+      setStaff(prev => prev.filter(s => s.uid !== deleteTarget.uid));
+      setDeleteTarget(null);
+    } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   return (
@@ -83,9 +97,18 @@ const StaffManagement = () => {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     {s.uid !== currentUser.uid && (
-                      <button onClick={() => handleToggleStatus(s.uid, s.isActive)} className={`text-xs font-medium ${s.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}>
-                        {s.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <>
+                        <button onClick={() => handleToggleStatus(s.uid, s.isActive)} className={`text-xs font-medium ${s.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}>
+                          {s.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(s)}
+                          title="Delete staff"
+                          className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -135,6 +158,14 @@ const StaffManagement = () => {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        deleting={deleting}
+        title="Delete Staff Member"
+        message="Are you sure you want to delete this staff account? This removes them from Firestore. This action cannot be undone."
+      />
     </Layout>
   );
 };

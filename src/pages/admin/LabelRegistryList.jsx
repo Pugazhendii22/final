@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import Layout from '../../components/common/Layout';
 import { printLabel } from '../../utils/printLabel.jsx';
+import { useAuth } from '../../context/AuthContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const LabelRegistryList = () => {
+  const { userRole } = useAuth();
   const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingLabel, setEditingLabel] = useState(null);
   const [newLabelNum, setNewLabelNum] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchLabels = async () => {
     try {
@@ -31,6 +36,17 @@ const LabelRegistryList = () => {
       setEditingLabel(null);
       fetchLabels();
     } catch (err) { console.error(err); alert('Failed to update label number'); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'label_registry', deleteTarget.id));
+      setLabels(prev => prev.filter(l => l.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   const filteredLabels = labels.filter(l => !searchQuery || String(l.labelNumber).includes(searchQuery));
@@ -75,6 +91,15 @@ const LabelRegistryList = () => {
                   <td className="px-4 py-3 whitespace-nowrap text-right space-x-1">
                     <button onClick={() => printLabel(l)} className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">Print</button>
                     <button onClick={() => handleEditClick(l)} className="text-indigo-600 hover:text-indigo-900 text-xs font-medium">Edit</button>
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={() => setDeleteTarget(l)}
+                        title="Delete label"
+                        className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -95,6 +120,14 @@ const LabelRegistryList = () => {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        deleting={deleting}
+        title="Delete Label"
+        message="Are you sure you want to delete this label entry? This action cannot be undone."
+      />
     </Layout>
   );
 };
