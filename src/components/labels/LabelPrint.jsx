@@ -53,6 +53,11 @@ const LabelPrint = ({ labelData }) => {
                   <div style={{ fontSize: '10px', color: 'gray', textAlign: 'center', marginTop: '1px' }}>
                     {labelData.labelNumber ? `S/N: ${labelData.labelNumber}` : 'UNASSIGNED'}
                   </div>
+                  {d.serialNumber && (
+                    <div style={{ fontSize: '10px', color: 'gray', textAlign: 'center', marginTop: '1px' }}>
+                      S/N: {d.serialNumber}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div style={{ fontSize: '10px', color: 'gray', padding: '10px 0' }}>No barcode available</div>

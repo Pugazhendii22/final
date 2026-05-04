@@ -83,6 +83,7 @@ const SecondHandView = () => {
           ram: mobile.ram || '', rom: mobile.rom || '',
           condition: mobile.condition || '', grade: mobile.condition || '',
           imei1: mobile.imei1 || '', imei2: mobile.imei2 || '',
+          serialNumber: mobile.serialNumber || '',
           purchasePrice: Number(mobile.purchasePrice || 0),
           salePrice: Number(mobile.salePrice || 0),
           purchaseDate: mobile.purchaseDate || '', supplier: mobile.supplier || '',
@@ -144,6 +145,7 @@ const SecondHandView = () => {
               <div><dt className="text-sm font-medium text-gray-500">Config</dt><dd className="mt-1 text-sm text-gray-900">{mobile.ram} / {mobile.rom}</dd></div>
               <div><dt className="text-sm font-medium text-gray-500">IMEI 1</dt><dd className="mt-1 text-sm text-gray-900">{mobile.imei1}</dd></div>
               <div><dt className="text-sm font-medium text-gray-500">IMEI 2</dt><dd className="mt-1 text-sm text-gray-900">{mobile.imei2 || '-'}</dd></div>
+              <div><dt className="text-sm font-medium text-gray-500">Serial Number</dt><dd className="mt-1 text-sm text-gray-900">{mobile.serialNumber || 'Not provided'}</dd></div>
               <div><dt className="text-sm font-medium text-gray-500">Condition</dt><dd className="mt-1 text-sm text-gray-900">Grade {mobile.condition}</dd></div>
             </dl>
             <dl className="space-y-4">

@@ -107,6 +107,7 @@ const ScanResult = () => {
               <Row label="Condition" value={d.condition || `Grade ${d.grade}`} />
               <Row label="IMEI 1" value={d.imei1 || '-'} />
               <Row label="IMEI 2" value={d.imei2 || '-'} />
+              <Row label="Serial Number" value={d.serialNumber || 'Not provided'} />
             </Section>
 
             <Section title="Pricing">

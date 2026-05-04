@@ -59,6 +59,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
       rom: base.rom || '',
       imei1: base.imei1 || '',
       imei2: base.imei2 || '',
+      serialNumber: base.serialNumber || '',
       purchasePrice: base.purchasePrice || '',
       salePrice: base.salePrice || '',
       condition: initialCondition,
@@ -281,7 +282,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
           assignedBy: currentUser.uid,
           assignedAt: new Date().toISOString(),
           isActive: true,
-          data: { ...formData }
+          data: { ...formData, serialNumber: formData.serialNumber || '' }
         });
         setLabelAssigned(true);
         setAssignedLabelNumber(nextNum);
@@ -307,6 +308,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
           salePrice: formData.salePrice,
           imei1: formData.imei1,
           grade: formData.condition,
+          serialNumber: formData.serialNumber || '',
         }
       });
     } else {
@@ -322,6 +324,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
           salePrice: formData.salePrice,
           imei1: formData.imei1,
           grade: formData.condition,
+          serialNumber: formData.serialNumber || '',
         }
       });
     }
@@ -456,6 +459,28 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
             scannerId="scanner-secondhand-imei2"
           />
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Serial Number {formData.brand === 'Apple' && <span className="text-red-500">*</span>}
+          </label>
+          <input
+            type="text"
+            value={formData.serialNumber}
+            onChange={e => setFormData({...formData, serialNumber: e.target.value})}
+            required={formData.brand === 'Apple'}
+            placeholder="Enter serial number (especially for iPhones)"
+            className={`mt-1 block w-full border rounded-md p-2 ${
+              formData.brand === 'Apple'
+                ? 'border-blue-500 ring-1 ring-blue-400 focus:ring-blue-500'
+                : 'border-gray-300'
+            }`}
+          />
+          {formData.brand === 'Apple' && (
+            <p className="text-xs text-blue-600 mt-1">Required for Apple devices</p>
+          )}
+        </div>
+        <div /> {/* Empty cell to maintain 2-column grid */}
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Purchase Price *</label>
