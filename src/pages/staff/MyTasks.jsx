@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { useState, useEffect, useCallback } from 'react';
+import { collection, query, where, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/common/Layout';
@@ -8,16 +8,10 @@ import { checkAndResetTasks } from '../../utils/taskResetLogic';
 const MyTasks = () => {
   const { currentUser } = useAuth();
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState('All'); // All | Daily | Weekly | Monthly | Pending | Completed
 
-  useEffect(() => {
-    fetchTasks();
-  }, [currentUser]);
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     if (!currentUser) return;
-    setLoading(true);
     try {
       await checkAndResetTasks();
       
@@ -35,10 +29,12 @@ const MyTasks = () => {
       setTasks(tasksList);
     } catch (error) {
       console.error('Error fetching tasks:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchTasks(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMarkAsDone = async (id) => {
     try {
@@ -50,29 +46,6 @@ const MyTasks = () => {
       fetchTasks();
     } catch (error) {
       console.error('Error marking task as done:', error);
-    }
-  };
-
-  const getTimeDeltaText = (targetDate) => {
-    if (!targetDate) return '';
-    const date = targetDate instanceof Date ? targetDate : (targetDate?.toDate ? targetDate.toDate() : new Date(targetDate));
-    if (Number.isNaN(date.getTime())) return '';
-    
-    const diffMs = date.getTime() - new Date().getTime();
-    const isOverdue = diffMs < 0;
-    const absMs = Math.abs(diffMs);
-    
-    const days = Math.floor(absMs / 86400000);
-    const hours = Math.floor((absMs % 86400000) / 3600000);
-    
-    if (isOverdue) {
-      if (days > 0) return `Overdue by ${days} day${days > 1 ? 's' : ''}`;
-      return `Overdue by ${hours} hour${hours !== 1 ? 's' : ''}`;
-    } else {
-      if (days === 1) return `Due tomorrow`;
-      if (days > 1) return `Due in ${days} days`;
-      if (hours > 0) return `Due in ${hours} hour${hours > 1 ? 's' : ''}`;
-      return 'Due very soon';
     }
   };
 
@@ -88,91 +61,101 @@ const MyTasks = () => {
     return task.frequency.toLowerCase() === filterTab.toLowerCase();
   });
 
-  const getPriorityColor = (priority) => {
-    if (priority === 'high') return 'bg-red-100 text-red-800 border-red-200';
-    if (priority === 'medium') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    return 'bg-green-100 text-green-800 border-green-200';
-  };
-
   return (
-    <Layout title="My Tasks">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Tasks</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your routines and to-dos.</p>
-      </div>
+  <Layout title="My Tasks" pageType="list">
+    {/* FILTER TABS */}
+    <div className="flex gap-2 px-4 pt-3 pb-2 overflow-x-auto scrollbar-hide">
+      {['All', 'Daily', 'Weekly', 'Monthly', 'Pending', 'Completed'].map(tab => (
+        <button
+          key={tab}
+          onClick={() => setFilterTab(tab)}
+          className={`flex-shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition ${
+            filterTab === tab
+              ? 'bg-[#002395] text-white'
+              : 'bg-white border border-gray-200 text-gray-500'
+          }`}
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
 
-      <div className="flex overflow-x-auto pb-4 hide-scrollbar w-full gap-2 mb-4">
-        {['All', 'Daily', 'Weekly', 'Monthly', 'Pending', 'Completed'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setFilterTab(tab)}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${filterTab === tab ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 bg-white border border-gray-200'}`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="text-center p-8 text-gray-500">Loading your tasks...</div>
-      ) : filteredTasks.length === 0 ? (
-        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-100 text-gray-500">
-          No tasks found for the selected filter.
+    {/* TASK CARDS */}
+    <div className="px-4 pt-2 space-y-3">
+      {filteredTasks.length === 0 ? (
+        <div className="text-center py-16">
+          <i className="fas fa-tasks text-4xl text-gray-200 mb-3 block"></i>
+          <p className="text-gray-400 text-sm">No tasks found</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredTasks.map(task => {
-            const dueDateText = getTimeDeltaText(task.dueDate);
-            const overdue = task.status === 'pending' && isOverdue(task.dueDate);
-            return (
-              <div key={task.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-2 gap-2">
-                  <h3 className="font-bold text-gray-900 leading-tight">{task.title}</h3>
-                  <span className={`shrink-0 px-2.5 py-0.5 rounded border text-[10px] uppercase font-bold tracking-wider ${getPriorityColor(task.priority)}`}>
+        filteredTasks.map(task => (
+          <div
+            key={task.id}
+            className={`bg-white rounded-2xl border-l-4 shadow-sm p-4 ${
+              task.status === 'completed' ? 'border-green-500 opacity-75' :
+              task.priority === 'high' ? 'border-[#ED2939]' :
+              task.priority === 'medium' ? 'border-orange-500' :
+              'border-[#002395]'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className={`font-semibold text-sm ${
+                    task.status === 'completed'
+                      ? 'line-through text-gray-400'
+                      : 'text-[#0f172a]'
+                  }`}>
+                    {task.title}
+                  </p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                    task.priority === 'medium' ? 'bg-orange-100 text-orange-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
                     {task.priority}
                   </span>
+                  <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">
+                    {task.frequency}
+                  </span>
                 </div>
-                
                 {task.description && (
-                  <p className="text-sm text-gray-500 mb-4 line-clamp-2">{task.description}</p>
+                  <p className="text-gray-400 text-xs mt-1">{task.description}</p>
                 )}
-                
-                <div className="mt-auto pt-4 border-t border-gray-100 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-600 capitalize`}>
-                      {task.frequency}
+                <p className={`text-xs mt-2 font-medium ${
+                  isOverdue(task.dueDate) && task.status === 'pending'
+                    ? 'text-[#ED2939]'
+                    : 'text-gray-400'
+                }`}>
+                  <i className="fas fa-clock mr-1"></i>
+                  Due: {task.dueDate?.toDate?.()?.toLocaleDateString('en-IN')}
+                  {isOverdue(task.dueDate) && task.status === 'pending' && (
+                    <span className="ml-1 bg-[#ED2939] text-white text-xs px-1.5 py-0.5 rounded-full">
+                      Overdue
                     </span>
-                    {task.status === 'pending' ? (
-                      <span className={`text-xs font-semibold ${overdue ? 'text-red-600' : 'text-gray-500'}`}>
-                        {dueDateText}
-                      </span>
-                    ) : (
-                      <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
-                        Completed ✓
-                      </span>
-                    )}
-                  </div>
-                  
-                  {task.status === 'pending' && (
-                    <button
-                      onClick={() => handleMarkAsDone(task.id)}
-                      className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg text-sm transition-colors"
-                    >
-                      Mark as Done
-                    </button>
                   )}
-                  {task.status === 'completed' && task.completedAt && (
-                    <div className="text-center text-xs text-gray-400">
-                      Done at {task.completedAt.toDate().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  )}
-                </div>
+                </p>
               </div>
-            );
-          })}
-        </div>
+              <div className="flex-shrink-0">
+                {task.status === 'pending' ? (
+                  <button
+                    onClick={() => handleMarkAsDone(task.id)}
+                    className="bg-[#002395] text-white px-3 py-2 rounded-xl text-xs font-semibold"
+                  >
+                    Done ✓
+                  </button>
+                ) : (
+                  <span className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-xs font-semibold">
+                    Completed ✓
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
       )}
-    </Layout>
+    </div>
+  </Layout>
   );
 };
 

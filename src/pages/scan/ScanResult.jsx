@@ -18,7 +18,7 @@ const Row = ({ label, value, isBold = true }) => (
 );
 
 const Section = ({ title, children }) => (
-  <div className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+  <div className="bg-white rounded-xl p-4 mb-3 shadow-sm break-words">
     {title && <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{title}</h3>}
     {children}
   </div>
@@ -46,14 +46,14 @@ const ScanResult = () => {
     fetchRegistry();
   }, [labelNumber]);
 
-  if (loading) return <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">Loading...</div>;
+  if (loading) return <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">Loading...</div>;
   if (!data) return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 pt-10 max-w-[480px] mx-auto">
-      <div className="bg-indigo-900 w-full p-4 rounded-t-xl text-center">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-4 pt-10 max-w-[480px] mx-auto">
+      <div className="bg-[#002395] w-full p-4 rounded-t-2xl text-center break-words">
         <h1 className="text-xl font-bold text-white tracking-widest uppercase">FRENCH MOBILES</h1>
       </div>
-      <div className="bg-white p-8 w-full rounded-b-xl shadow-sm text-center">
-        <h2 className="text-lg font-bold text-gray-900 mb-2">Label #{labelNumber} not found</h2>
+      <div className="bg-white p-4 md:p-8 w-full rounded-b-2xl shadow-sm border-x border-b border-[#e2e8f0] text-center break-words">
+        <h2 className="text-lg font-bold text-[#0f172a] mb-2">Label #{labelNumber} not found</h2>
       </div>
     </div>
   );
@@ -71,233 +71,215 @@ const ScanResult = () => {
   const typeName = labelType.replace('_', ' ').toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 pb-10 flex flex-col items-center">
-      <div className="w-full max-w-[480px]">
-        {/* Header Section */}
-        <div className="bg-indigo-900 rounded-xl p-6 mb-3 shadow-sm text-center text-white">
-          <h1 className="text-xl font-bold tracking-widest mb-4">FRENCH MOBILES</h1>
-          <div className="flex justify-center items-center space-x-2 mb-3">
-            <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">#{data.labelNumber}</span>
-            <Badge color={typeColor}>{typeName}</Badge>
-          </div>
-          <div className="text-xs text-indigo-200">
-            Assigned: {new Date(assignedAt).toLocaleDateString()}
-          </div>
-        </div>
+  <div className="min-h-screen bg-[#f8fafc] pb-8">
 
-        {hasPatternLock && (
-          <Section title="Phone Lock Pattern">
-            <PatternLock value={d.lockPattern || []} readOnly />
-          </Section>
-        )}
+    {/* HEADER */}
+    <div className="bg-[#002395] px-4 py-4 text-center">
+      <p className="text-white/70 text-xs uppercase tracking-widest mb-1">French Mobiles</p>
+      <h1 className="text-white font-bold text-lg">Label #{labelNumber}</h1>
+      {labelType && (
+        <span className={`inline-block mt-2 text-xs px-3 py-1 rounded-full font-medium ${
+          labelType === 'service_order' ? 'bg-[#ED2939] text-white' :
+          labelType === 'second_hand' ? 'bg-white text-[#002395]' :
+          labelType === 'product' ? 'bg-green-400 text-white' :
+          'bg-orange-400 text-white'
+        }`}>
+          {labelType === 'service_order' ? 'Service Order' :
+           labelType === 'second_hand' ? 'Second-Hand Mobile' :
+           labelType === 'product' ? 'Product' : 'Sale'}
+        </span>
+      )}
+    </div>
+
+    {loading ? (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-10 h-10 border-4 border-[#002395] border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-400 text-sm">Loading...</p>
+      </div>
+    ) : !data ? (
+      <div className="text-center py-20 px-4">
+        <i className="fas fa-exclamation-circle text-4xl text-gray-200 mb-3 block"></i>
+        <p className="text-gray-500 font-semibold">Label #{labelNumber} not found</p>
+        <p className="text-gray-400 text-sm mt-1">This label may not be assigned yet</p>
+      </div>
+    ) : (
+      <div className="px-4 py-4 space-y-4 max-w-md mx-auto">
+
         {labelType === 'second_hand' && (
           <>
-            <Section title="Device Info">
-              <Row label="Brand & Model" value={`${d.brand} ${d.model}`} />
-              <Row label="Config" value={`${d.ram} / ${d.rom}`} />
-              <div className="flex justify-between items-center py-1 mt-1">
-                <span className="text-gray-500 text-sm">Grade</span>
-                <Badge color={
-                  d.grade === 'A' ? 'bg-green-100 text-green-800' :
-                  d.grade === 'B' ? 'bg-blue-100 text-blue-800' :
-                  d.grade === 'C' ? 'bg-orange-100 text-orange-800' :
-                  'bg-red-100 text-red-800'
-                }>Grade {d.grade}</Badge>
+            <div className="bg-white rounded-2xl shadow-sm border-l-4 border-[#002395] p-5">
+              <h2 className="text-xl font-bold text-[#0f172a]">
+                {d?.brand} {d?.model}
+              </h2>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {d?.ram && (
+                  <span className="bg-[#002395]/10 text-[#002395] text-xs px-2 py-0.5 rounded-full">
+                    {d.ram} RAM
+                  </span>
+                )}
+                {d?.rom && (
+                  <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                    {d.rom} ROM
+                  </span>
+                )}
+                {d?.grade && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    d.grade === 'A' ? 'bg-green-100 text-green-700' :
+                    d.grade === 'B' ? 'bg-blue-100 text-blue-700' :
+                    d.grade === 'C' ? 'bg-orange-100 text-orange-700' :
+                    'bg-red-100 text-[#ED2939]'
+                  }`}>
+                    Grade {d.grade}
+                  </span>
+                )}
               </div>
-              <Row label="Condition" value={d.condition || `Grade ${d.grade}`} />
-              <Row label="IMEI 1" value={d.imei1 || '-'} />
-              <Row label="IMEI 2" value={d.imei2 || '-'} />
-              <Row label="Serial Number" value={d.serialNumber || 'Not provided'} />
-            </Section>
-
-            <Section title="Pricing">
-              <Row label="Purchase Price" value={`₹${d.purchasePrice}`} />
-              <Row label="Sale Price" value={`₹${d.salePrice}`} />
-            </Section>
-
-            <Section title="Purchase Info">
-              <Row label="Purchase Date" value={d.purchaseDate ? new Date(d.purchaseDate).toLocaleDateString() : '-'} />
-              <Row label="Supplier" value={d.supplier || '-'} />
-              {d.specialNotes && (
-                <div className="mt-2 text-sm bg-gray-50 p-2 rounded">
-                  <span className="text-gray-500 block text-xs">Special Notes</span>
-                  {d.specialNotes}
+              <p className="text-2xl font-bold text-[#002395] mt-3">
+                ₹{d?.salePrice}
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Device Info
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {d?.imei1 && (
+                  <div>
+                    <p className="text-xs text-gray-400">IMEI 1</p>
+                    <p className="font-semibold text-[#0f172a] text-sm break-all">{d.imei1}</p>
+                  </div>
+                )}
+                {d?.serialNumber && (
+                  <div>
+                    <p className="text-xs text-gray-400">Serial Number</p>
+                    <p className="font-semibold text-[#0f172a] text-sm break-all">{d.serialNumber}</p>
+                  </div>
+                )}
+                {d?.condition && (
+                  <div>
+                    <p className="text-xs text-gray-400">Condition</p>
+                    <p className="font-semibold text-[#0f172a] text-sm">{d.condition}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-gray-400">Status</p>
+                  <p className={`font-semibold text-sm ${
+                    d?.status === 'available' ? 'text-green-600' : 'text-gray-500'
+                  }`}>
+                    {d?.status === 'available' ? 'Available' : 'Sold'}
+                  </p>
                 </div>
-              )}
-            </Section>
-
-            <Section title="Status">
-              <div className="flex justify-between items-center py-1">
-                <span className="text-gray-500 text-sm">Current Status</span>
-                <Badge color={d.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                  {d.status?.toUpperCase() || 'UNKNOWN'}
-                </Badge>
               </div>
-            </Section>
-
-            {d.conditionChecklist && Object.keys(d.conditionChecklist).length > 0 && (
-              <Section title="Condition Checklist">
-                <div className="grid grid-cols-1 gap-2">
-                  {Object.entries(d.conditionChecklist).map(([k, v]) => (
-                    <div key={k} className="flex justify-between items-center text-sm border-b border-gray-50 pb-1">
-                      <span className="text-gray-700 capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}</span>
-                      {v === 'Working' || v === 'No' ? (
-                         <span className="text-green-600 font-bold flex items-center">
-                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                           {v}
-                         </span>
-                      ) : (
-                         <span className="text-red-600 font-bold flex items-center">
-                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                           {v}
-                         </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
+            </div>
           </>
         )}
 
         {labelType === 'service_order' && (
           <>
-            <Section title="Order Info">
-              <Row label="Order Number" value={d.orderNumber} />
-              <Row label="Date Received" value={d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'} />
-            </Section>
-
-            <Section title="Device">
-              <Row label="Brand & Model" value={`${d.brand} ${d.model}`} />
-              <Row label="Colour" value={d.colour || '-'} />
-            </Section>
-
-            <Section title="Customer">
-              <Row label="Name" value={d.customerName} />
-              <Row label="Phone" value={d.customerPhone} />
-            </Section>
-
-            <Section title="Service Details">
-              <div className="mb-3">
-                <span className="text-gray-500 text-sm block mb-1">Complaints</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {d.complaintTypes?.length > 0 ? (
-                    d.complaintTypes.map((c, i) => <Badge key={i} color="bg-red-50 text-red-700 border border-red-100">{c}</Badge>)
-                  ) : (
-                    <Badge color="bg-red-50 text-red-700 border border-red-100">{d.complaintType}</Badge>
-                  )}
+            <div className="bg-white rounded-2xl shadow-sm border-l-4 border-[#ED2939] p-5">
+              <p className="text-xs font-bold text-[#ED2939] font-mono">{d?.orderNumber}</p>
+              <h2 className="text-xl font-bold text-[#0f172a] mt-1">{d?.customerName}</h2>
+              <p className="text-gray-500 text-sm mt-0.5">{d?.customerPhone}</p>
+              <p className="text-lg font-bold text-[#002395] mt-2">₹{d?.estimatedPrice}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Service Details
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-gray-400">Device</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">
+                    {d?.brand} {d?.model}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Technician</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{d?.technicianName}</p>
                 </div>
               </div>
-              {d.problemDetails && (
-                <div className="mb-3 text-sm bg-gray-50 p-2 rounded">
-                  <span className="text-gray-500 block text-xs">Details</span>
-                  {d.problemDetails}
+              {d?.complaintTypes?.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-gray-400 mb-2">Issues</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {d.complaintTypes.map((c, i) => (
+                      <span key={i} className="bg-[#ED2939]/10 text-[#ED2939] text-xs px-2 py-0.5 rounded-full">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
-              <Row label="Estimated Price" value={`₹${d.estimatedPrice || 0}`} />
-              <Row label="Advance Paid" value={`₹${d.advancePaid || 0}`} />
-            </Section>
-
-            <Section title="Status">
-              <div className="flex justify-between items-center py-1 mb-2">
-                <span className="text-gray-500 text-sm">Status</span>
-                <Badge color={
-                  d.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                  d.status === 'Returned' ? 'bg-gray-100 text-gray-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }>{d.status || 'Received'}</Badge>
-              </div>
-              <Row label="Technician" value={d.technicianName || 'Unassigned'} />
-            </Section>
-
-            {d.accessoriesCollected && d.accessoriesCollected.length > 0 && (
-              <Section title="Accessories Collected">
-                <div className="text-sm font-medium">{d.accessoriesCollected.join(', ')}</div>
-              </Section>
-            )}
+            </div>
           </>
         )}
 
         {labelType === 'product' && (
           <>
-            <Section title="Product Info">
-              <Row label="Name" value={d.productName} />
-              <Row label="Brand & Category" value={`${d.brand} • ${d.category}`} />
-              <Row label="SKU" value={d.sku} />
-            </Section>
-
-            <Section title="Pricing">
-              <Row label="Sale Price" value={`₹${d.salePrice}`} />
-            </Section>
-
-            <Section title="Stock">
-              <Row label="Quantity" value={d.stockQuantity} />
-              <div className="flex justify-between items-center py-1 mt-1">
-                <span className="text-gray-500 text-sm">Status</span>
-                <Badge color={d.stockQuantity > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                  {d.stockQuantity > 0 ? 'In Stock' : 'Out of Stock'}
-                </Badge>
+            <div className="bg-white rounded-2xl shadow-sm border-l-4 border-green-500 p-5">
+              <h2 className="text-xl font-bold text-[#0f172a]">{d?.productName}</h2>
+              <p className="text-gray-400 text-sm mt-0.5">
+                {d?.brand} · {d?.category}
+              </p>
+              <p className="text-2xl font-bold text-[#002395] mt-2">₹{d?.salePrice}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Stock Info
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {d?.sku && (
+                  <div>
+                    <p className="text-xs text-gray-400">SKU</p>
+                    <p className="font-semibold text-[#0f172a] text-sm">{d.sku}</p>
+                  </div>
+                )}
+                {d?.stockQuantity && (
+                  <div>
+                    <p className="text-xs text-gray-400">Stock</p>
+                    <p className="font-semibold text-[#0f172a] text-sm">{d.stockQuantity} units</p>
+                  </div>
+                )}
               </div>
-            </Section>
+            </div>
           </>
         )}
 
         {labelType === 'sale' && (
           <>
-            <Section title="Invoice Info">
-              <Row label="Invoice Number" value={d.invoiceNumber} />
-              <Row label="Sale Date" value={d.saleDate ? new Date(d.saleDate).toLocaleDateString() : '-'} />
-            </Section>
-
-            <Section title="Customer">
-              <Row label="Name" value={d.customerName} />
-              <Row label="Phone" value={d.customerPhone} />
-            </Section>
-
-            <Section title="Items">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="text-left py-2 font-medium">Item</th>
-                      <th className="text-right py-2 font-medium">Qty</th>
-                      <th className="text-right py-2 font-medium">Price</th>
-                      <th className="text-right py-2 font-medium">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {d.items?.map((item, i) => (
-                      <tr key={i}>
-                        <td className="py-2">{item.name}</td>
-                        <td className="py-2 text-right">{item.quantity}</td>
-                        <td className="py-2 text-right">₹{item.unitPrice}</td>
-                        <td className="py-2 text-right font-medium">₹{item.total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="bg-white rounded-2xl shadow-sm border-l-4 border-orange-500 p-5">
+              <p className="text-xs font-bold text-[#002395] font-mono">{d?.invoiceNumber}</p>
+              <h2 className="text-xl font-bold text-[#0f172a] mt-1">{d?.customerName}</h2>
+              <p className="text-gray-500 text-sm mt-0.5">{d?.customerPhone}</p>
+              <p className="text-2xl font-bold text-[#002395] mt-2">₹{d?.totalAmount}</p>
+            </div>
+            {d?.items?.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                  Items
+                </p>
+                <div className="space-y-2">
+                  {d.items.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-[#0f172a]">{item.name}</span>
+                      <span className="font-semibold text-[#002395]">₹{item.total}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </Section>
-
-            <Section title="Payment">
-              <Row label="Subtotal" value={`₹${d.subtotal}`} isBold={false} />
-              <Row label="Discount" value={`₹${d.discount || 0}`} isBold={false} />
-              <div className="border-t my-2 pt-2">
-                <Row label="Total Amount" value={`₹${d.totalAmount}`} />
-              </div>
-              <div className="flex justify-between items-center py-1 mt-2 mb-2">
-                <span className="text-gray-500 text-sm">Payment Method</span>
-                <Badge color="bg-indigo-100 text-indigo-800">{d.paymentMethod}</Badge>
-              </div>
-              <Row label="Amount Paid" value={`₹${d.amountPaid}`} />
-              <Row label="Balance Due" value={`₹${d.balanceDue}`} />
-            </Section>
+            )}
           </>
         )}
 
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 text-center">
+            Assigned on {assignedAt ? new Date(assignedAt).toLocaleDateString('en-IN') : '-'}
+          </p>
+        </div>
+
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 };
 
 export default ScanResult;

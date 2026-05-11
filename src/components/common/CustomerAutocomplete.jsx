@@ -66,12 +66,12 @@ const CustomerAutocomplete = ({
           value={nameValue} 
           onChange={(e) => handleChange(e, 'name')} 
           onFocus={() => handleFocus('name')}
-          className="mt-1 block w-full border border-gray-300 rounded-md p-2" 
+          className="mt-1 block w-full border border-gray-300 rounded-md p-2 break-words" 
           placeholder="Enter customer name"
           autoComplete="off"
         />
         {showDropdown && activeInput === 'name' && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto break-words">
             {queryLength < 2 ? (
               <div className="p-2 text-sm text-gray-500 bg-gray-50 border-b">Type at least 2 characters</div>
             ) : filtered.length === 0 ? (
@@ -99,17 +99,19 @@ const CustomerAutocomplete = ({
         <div className="relative" ref={phoneRef}>
           <label className="block text-sm font-medium text-gray-700">Customer Phone (Search/Add) *</label>
           <input 
-            type="text" 
+            type="tel" 
+            inputMode="tel"
+            pattern="[0-9]*"
             required 
             value={phoneValue} 
             onChange={(e) => handleChange(e, 'phone')} 
             onFocus={() => handleFocus('phone')}
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2" 
+            className="mt-1 block w-full border border-gray-300 rounded-md p-2 break-words" 
             placeholder="Enter mobile number" 
             autoComplete="off"
           />
           {showDropdown && activeInput === 'phone' && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto break-words">
               {queryLength < 2 ? (
                 <div className="p-2 text-sm text-gray-500 bg-gray-50 border-b">Type at least 2 characters</div>
               ) : filtered.length === 0 ? (
@@ -135,10 +137,12 @@ const CustomerAutocomplete = ({
         <div>
           <label className="block text-sm font-medium text-gray-700">Alternate Number</label>
           <input
-            type="text"
+            type="tel"
+            inputMode="tel"
+            pattern="[0-9]*"
             value={alternatePhoneValue || ''}
             onChange={(e) => onAlternatePhoneChange?.(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+            className="mt-1 block w-full border border-gray-300 rounded-md p-2 break-words"
             placeholder="Alternate / WhatsApp number"
           />
         </div>

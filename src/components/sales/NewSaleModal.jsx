@@ -1,11 +1,9 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, increment } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import SalesForm from '../../pages/sales/SalesForm';
 
-const NewSaleModal = ({ isOpen, onClose, prefillData, onSuccess }) => {
-  if (!isOpen) return null;
-
+const NewSaleModal = ({ isOpen = true, modalOnly = false, onClose, prefillData, onSuccess }) => {
   const generateInvoiceNumber = async () => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
@@ -22,7 +20,7 @@ const NewSaleModal = ({ isOpen, onClose, prefillData, onSuccess }) => {
 
   const handleSaveSale = async (data) => {
     const invoiceNumber = await generateInvoiceNumber();
-    
+
     const newSale = {
       ...data,
       invoiceNumber,
@@ -79,19 +77,39 @@ const NewSaleModal = ({ isOpen, onClose, prefillData, onSuccess }) => {
     onClose();
   };
 
-  return (
-    <div className="fixed z-50 inset-0 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-5">Create New Sale</h3>
-            <div className="max-h-[75vh] overflow-y-auto px-2">
-              <SalesForm onSave={handleSaveSale} onCancel={onClose} prefillData={prefillData} />
-            </div>
-          </div>
-        </div>
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [isOpen]);
+
+  if (isOpen === false) return null;
+
+  const modalContent = (
+    <div className="relative bg-white rounded-2xl w-full max-w-4xl mx-auto my-8 shadow-2xl border border-[#e2e8f0]">
+      <div className="flex items-center justify-between px-6 py-4 bg-[#002395] rounded-t-2xl">
+        <h3 className="text-lg font-bold text-white">Create New Sale</h3>
+        <button onClick={onClose} className="text-white hover:text-blue-200 p-1 rounded transition">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
+      <div className="overflow-visible flex-1 px-4 py-4">
+        <SalesForm onSave={handleSaveSale} onCancel={onClose} prefillData={prefillData} />
+      </div>
+    </div>
+  );
+
+  if (modalOnly) {
+    return modalContent;
+  }
+
+  return (
+    <div className="fixed z-50 inset-0 bg-black/50 overflow-y-auto flex items-start justify-center p-4">
+      <div className="fixed inset-0" onClick={onClose}></div>
+      {modalContent}
     </div>
   );
 };

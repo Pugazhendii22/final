@@ -1,32 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import SecondHandForm from './SecondHandForm';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-0 sm:p-4">
-    <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-    <div className="relative w-full sm:max-w-3xl sm:rounded-xl bg-white shadow-2xl z-10 flex flex-col max-h-screen sm:max-h-[90vh]">
-      <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white rounded-t-xl">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+  <div className="fixed inset-0 z-50 bg-black/50 overflow-y-auto flex items-start justify-center p-4">
+    <div className="fixed inset-0" onClick={onClose} />
+    <div className="relative bg-white rounded-2xl w-full max-w-4xl mx-auto my-8 shadow-sm border border-[#e2e8f0]">
+      <div className="flex items-center justify-between px-6 py-4 bg-[#002395] rounded-t-2xl border-b">
+        <h3 className="text-lg font-bold text-white tracking-wide">{title}</h3>
+        <button onClick={onClose} className="text-white hover:text-blue-200 p-1 rounded transition">
+          <i className="fas fa-times text-xl"></i>
         </button>
       </div>
-      <div className="overflow-y-auto flex-1 px-5 py-4">{children}</div>
+      <div className="overflow-visible flex-1 px-6 py-6 bg-[#f8fafc] rounded-b-2xl">{children}</div>
     </div>
   </div>
 );
 
 const SecondHandList = () => {
   const { userRole } = useAuth();
+  const navigate = useNavigate();
   const [mobiles, setMobiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -74,103 +78,211 @@ const SecondHandList = () => {
     finally { setDeleting(false); }
   };
 
-  const filteredMobiles = mobiles.filter(m => {
-    if (!searchQuery) return true;
-    const q = searchQuery.replace(/\s+/g, '').toLowerCase();
-    return [m.brand, m.model, m.imei1, m.imei2, m.serialNumber].some(v => v?.replace(/\s+/g, '').toLowerCase().includes(q));
-  });
+  const filteredMobiles = useMemo(() => {
+    return mobiles.filter(m => {
+      if (filterStatus !== 'all' && (m.status || 'available') !== filterStatus) return false;
+      
+      const q = searchQuery.replace(/\s+/g, '').toLowerCase();
+      const matchesSearch = !searchQuery || 
+        [m.brand, m.model, m.imei1, m.imei2, m.serialNumber].some(v => 
+          v?.replace(/\s+/g, '').toLowerCase().includes(q)
+        );
+      
+      // Date filtering
+      const mobileDate = m.createdAt ? new Date(m.createdAt) : null;
+      const matchesFrom = !fromDate || (mobileDate && mobileDate >= new Date(fromDate));
+      const matchesTo = !toDate || (mobileDate && mobileDate <= new Date(toDate + 'T23:59:59'));
+      
+      return matchesSearch && matchesFrom && matchesTo;
+    });
+  }, [mobiles, filterStatus, searchQuery, fromDate, toDate]);
 
-  const gradeColor = (g) => ({ A: 'bg-green-100 text-green-800', B: 'bg-blue-100 text-blue-800', C: 'bg-yellow-100 text-yellow-800', D: 'bg-red-100 text-red-800' }[g] || 'bg-gray-100 text-gray-800');
+  const gradeColor = (g) => ({ 
+    A: 'bg-green-100 text-green-700', 
+    B: 'bg-blue-100 text-blue-700', 
+    C: 'bg-orange-100 text-orange-700', 
+    D: 'bg-red-100 text-red-700' 
+  }[g] || 'bg-gray-100 text-[#64748b]');
+
+  const fab = (
+    <button
+      onClick={() => setShowModal(true)}
+      className="fixed bottom-20 right-6 w-14 h-14 bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden z-40"
+      style={{ borderRadius: '50%', boxShadow: '0 4px 6px -1px rgba(0, 35, 149, 0.1), 0 2px 4px -1px rgba(0, 35, 149, 0.06)' }}
+      aria-label="Add Mobile"
+    >
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+    </button>
+  );
+
+  useEffect(() => {
+    if (showModal || deleteTarget) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [showModal, deleteTarget]);
 
   return (
-    <Layout title="Second-Hand Inventory">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Second-Hand Inventory</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{mobiles.length} device(s) in stock</p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm shrink-0"
-        >
-          + Add New Mobile
-        </button>
-      </div>
+    <Layout title="Second-Hand Inventory" pageType="list" fab={fab}>
+      <div className="bg-[#f8fafc] min-h-[calc(100vh-100px)] flex-1 min-w-0">
+        <div className="max-w-7xl mx-auto pb-8 flex-1 min-w-0">
 
-      <input
-        type="text"
-        placeholder="Search by brand, model, IMEI or serial number..."
-        value={searchQuery}
-        onChange={e => setSearchQuery(e.target.value)}
-        className="w-full mb-4 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-      />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-[#0f172a]">Second-Hand Mobiles</h1>
+              <span className="bg-[#002395] text-white text-xs font-bold px-2.5 py-1 rounded-full">{mobiles.length}</span>
+            </div>
+          </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse" />)}</div>
-      ) : (
-        <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs tracking-wider">Brand & Model</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs tracking-wider hidden md:table-cell">RAM/ROM</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs tracking-wider">Condition</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs tracking-wider hidden md:table-cell">Purchase</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs tracking-wider">Sale Price</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs tracking-wider">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase text-xs tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {filteredMobiles.map(m => (
-                <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{m.brand} {m.model}</td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{m.ram}/{m.rom}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${gradeColor(m.condition)}`}>Grade {m.condition}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">₹{m.purchasePrice}</td>
-                  <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">₹{m.salePrice}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${m.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                      {(m.status || '').toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link to={`/inventory/second-hand/${m.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View / Edit</Link>
-                    {userRole === 'admin' && (
-                      <button
-                        onClick={() => handleDeleteClick(m)}
-                        title={m.status === 'sold' ? 'Cannot delete sold mobile' : 'Delete'}
-                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredMobiles.length === 0 && (
-                <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-400 text-sm">No mobiles found.</td></tr>
+          {/* SEARCH */}
+          <div className="mb-4">
+            <div className="relative">
+              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#002395]"></i>
+              <input
+                id="secondhand-search"
+                type="text"
+                placeholder="Search by brand, model, IMEI or serial number..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 border-2 border-[#e2e8f0] focus:border-[#002395] rounded-xl bg-white focus:outline-none transition-colors text-sm font-medium text-[#0f172a]"
+              />
+            </div>
+          </div>
+
+          {/* DATE FILTER */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div>
+                <p className="text-sm font-semibold text-[#002395]">Filter by date</p>
+                <p className="text-xs text-gray-500">Filter mobiles by addition date</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setFromDate(''); setToDate(''); }}
+                className="text-sm font-semibold text-[#ED2939] bg-[#ED2939]/10 px-3 py-2 rounded-xl hover:bg-[#ED2939]/15 transition"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">From</label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={e => setFromDate(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">To</label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={e => setToDate(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* FILTER PILLS */}
+          <div className="flex gap-2 pb-4 overflow-x-auto scrollbar-hide">
+            {['all', 'available', 'sold'].map(f => (
+              <button
+                key={f}
+                onClick={() => setFilterStatus(f)}
+                className={`flex-shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                  filterStatus === f
+                    ? f === 'available' ? 'bg-green-600 text-white'
+                    : f === 'sold'      ? 'bg-[#ED2939] text-white'
+                    : 'bg-[#002395] text-white'
+                    : 'bg-white border border-[#e2e8f0] text-[#64748b]'
+                }`}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* MOBILE CARDS */}
+          {loading ? (
+            <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-2xl h-24 animate-pulse" />)}</div>
+          ) : (
+            <div className="space-y-3">
+              {filteredMobiles.length === 0 ? (
+                <div className="text-center py-16">
+                  <i className="fas fa-mobile-alt text-4xl text-gray-200 mb-3 block"></i>
+                  <p className="text-gray-400 text-sm">No mobiles found</p>
+                </div>
+              ) : (
+                filteredMobiles.map(m => (
+                  <div
+                    key={m.id}
+                    onClick={() => navigate(`/inventory/second-hand/${m.id}`)}
+                    className={`bg-white rounded-2xl border-l-4 shadow-sm p-4 cursor-pointer active:scale-95 transition ${
+                      m.condition === 'A' ? 'border-green-500' :
+                      m.condition === 'B' ? 'border-[#002395]' :
+                      m.condition === 'C' ? 'border-orange-500' :
+                      'border-[#ED2939]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-[#0f172a] text-sm">{m.brand} {m.model}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${gradeColor(m.condition)}`}>
+                            Grade {m.condition}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {m.ram && <span className="bg-[#002395]/10 text-[#002395] text-xs px-2 py-0.5 rounded-full">{m.ram} RAM</span>}
+                          {m.rom && <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{m.rom} ROM</span>}
+                        </div>
+                        {m.imei1 && <p className="text-gray-400 text-xs mt-1">IMEI: {m.imei1}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <p className="font-bold text-[#002395] text-base">₹{m.salePrice}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          m.status === 'available' || !m.status
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {m.status === 'available' || !m.status ? 'Available' : 'Sold'}
+                        </span>
+                        {userRole === 'admin' && (
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDeleteClick(m); }}
+                            title={m.status === 'sold' ? 'Cannot delete sold mobile' : 'Delete'}
+                            className="text-[#ED2939] p-1"
+                          >
+                            <i className="fas fa-trash text-xs"></i>
+                          </button>
+                        )}
+                        <i className="fas fa-chevron-right text-gray-300 text-xs"></i>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          )}
 
-      {showModal && (
-        <Modal title="Add Second-Hand Mobile" onClose={() => setShowModal(false)}>
-          <SecondHandForm onSave={handleSaveMobile} onCancel={() => setShowModal(false)} />
-        </Modal>
-      )}
-      <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Mobile"
-        message="Are you sure you want to delete this mobile? This action cannot be undone."
-      />
+          {showModal && (
+            <SecondHandForm onSave={handleSaveMobile} onCancel={() => setShowModal(false)} />
+          )}
+          <ConfirmDeleteModal
+            isOpen={!!deleteTarget}
+            onCancel={() => setDeleteTarget(null)}
+            onConfirm={handleDelete}
+            deleting={deleting}
+            title="Delete Mobile"
+            message="Are you sure you want to delete this mobile? This action cannot be undone."
+          />
+        </div>
+      </div>
     </Layout>
   );
 };

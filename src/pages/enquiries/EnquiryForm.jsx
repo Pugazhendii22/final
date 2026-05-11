@@ -22,7 +22,7 @@ const EnquiryForm = ({ onSave, onCancel, initialData = null }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       const data = {
         ...formData,
@@ -35,7 +35,7 @@ const EnquiryForm = ({ onSave, onCancel, initialData = null }) => {
         data.createdAt = new Date().toISOString();
         data.createdBy = currentUser.uid;
       }
-      
+
       await onSave(data);
     } catch (err) {
       setError(err.message);
@@ -43,80 +43,197 @@ const EnquiryForm = ({ onSave, onCancel, initialData = null }) => {
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <div className="text-red-600 bg-red-100 p-3 rounded">{error}</div>}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+return (
+  <form onSubmit={handleSubmit} className="space-y-5 pb-4">
+
+    {error && (
+      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+        {error}
+      </div>
+    )}
+
+    {/* CUSTOMER DETAILS */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        Customer Details
+      </p>
+      <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Customer Name *</label>
-          <input type="text" required value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Name <span className="text-[#ED2939]">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.customerName}
+            onChange={e => setFormData({ ...formData, customerName: e.target.value })}
+            placeholder="Customer name"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">WhatsApp Number *</label>
-          <input type="text" required value={formData.customerPhone} onChange={e => setFormData({...formData, customerPhone: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            WhatsApp Number <span className="text-[#ED2939]">*</span>
+          </label>
+          <input
+            type="tel"
+            inputMode="tel"
+            pattern="[0-9]*"
+            required
+            value={formData.customerPhone}
+            onChange={e => setFormData({ ...formData, customerPhone: e.target.value })}
+            placeholder="WhatsApp number"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Model Enquired *</label>
-          <input type="text" required value={formData.modelEnquired} onChange={e => setFormData({...formData, modelEnquired: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
+      </div>
+    </div>
+
+    {/* ENQUIRY DETAILS */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        Enquiry Details
+      </p>
+      <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Min Budget</label>
-          <input type="number" min="0" value={formData.budgetMin} onChange={e => setFormData({...formData, budgetMin: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Model Enquired</label>
+          <input
+            type="text"
+            value={formData.modelEnquired}
+            onChange={e => setFormData({ ...formData, modelEnquired: e.target.value })}
+            placeholder="e.g. iPhone 15, Samsung S24"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Max Budget</label>
-          <input type="number" min="0" value={formData.budgetMax} onChange={e => setFormData({...formData, budgetMax: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Min Budget</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              min="0"
+              value={formData.budgetMin}
+              onChange={e => setFormData({ ...formData, budgetMin: e.target.value })}
+              placeholder="₹"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max Budget</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              min="0"
+              value={formData.budgetMax}
+              onChange={e => setFormData({ ...formData, budgetMax: e.target.value })}
+              placeholder="₹"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Medium</label>
-          <select value={formData.medium} onChange={e => setFormData({...formData, medium: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="Walk-in">Walk-in</option>
-            <option value="Instagram">Instagram</option>
-            <option value="YouTube">YouTube</option>
-            <option value="Referral">Referral</option>
-            <option value="Other">Other</option>
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+            <select
+              value={formData.medium}
+              onChange={e => setFormData({ ...formData, medium: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+            >
+              <option value="">Select</option>
+              <option value="Walk-in">Walk-in</option>
+              <option value="Instagram">Instagram</option>
+              <option value="YouTube">YouTube</option>
+              <option value="Referral">Referral</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Required Within</label>
+            <select
+              value={formData.requiredWithin}
+              onChange={e => setFormData({ ...formData, requiredWithin: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+            >
+              <option value="">Select</option>
+              <option value="Today">Today</option>
+              <option value="This Week">This Week</option>
+              <option value="This Month">This Month</option>
+              <option value="No Rush">No Rush</option>
+            </select>
+          </div>
         </div>
+      </div>
+    </div>
+
+    {/* STATUS & PRIORITY */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        Status & Priority
+      </p>
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Seriousness</label>
-          <select value={formData.seriousness} onChange={e => setFormData({...formData, seriousness: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="Urgent">Urgent</option>
-            <option value="Ordinary">Ordinary</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Required Within</label>
-          <select value={formData.requiredWithin} onChange={e => setFormData({...formData, requiredWithin: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="Today">Today</option>
-            <option value="This Week">This Week</option>
-            <option value="This Month">This Month</option>
-            <option value="No Rush">No Rush</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Status</label>
-          <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select
+            value={formData.status}
+            onChange={e => setFormData({ ...formData, status: e.target.value })}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+          >
             <option value="Open">Open</option>
             <option value="Follow-up">Follow-up</option>
             <option value="Converted">Converted</option>
             <option value="Closed">Closed</option>
           </select>
         </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Notes</label>
-          <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows="3"></textarea>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+          <select
+            value={formData.seriousness}
+            onChange={e => setFormData({ ...formData, seriousness: e.target.value })}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+          >
+            <option value="Ordinary">Ordinary</option>
+            <option value="Urgent">Urgent</option>
+          </select>
         </div>
       </div>
+    </div>
 
-      <div className="flex justify-end space-x-3 pt-4 border-t">
-        <button type="button" onClick={onCancel} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
-          {loading ? 'Saving...' : 'Save Enquiry'}
-        </button>
-      </div>
-    </form>
-  );
+    {/* NOTES */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        Notes
+      </p>
+      <textarea
+        value={formData.notes}
+        onChange={e => setFormData({ ...formData, notes: e.target.value })}
+        placeholder="Any additional notes..."
+        rows={3}
+        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+      />
+    </div>
+
+    {/* SUBMIT BUTTONS */}
+    <div className="flex gap-3 pt-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-semibold"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={loading}
+        className="flex-1 bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+      >
+        {loading ? 'Saving...' : initialData ? 'Save Changes' : 'Add Enquiry'}
+      </button>
+    </div>
+
+  </form>
+);
 };
 
 export default EnquiryForm;

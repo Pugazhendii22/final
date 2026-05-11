@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, setDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import CustomerAutocomplete from '../../components/common/CustomerAutocomplete';
 import ImeiInput from '../../components/ImeiInput';
 import { getLabelNumber } from '../../utils/getLabelNumber';
 import { printLabel } from '../../utils/printLabel.jsx';
+import { uploadImageToCloudinary } from '../../utils/uploadImage';
+
+const generateSerialNumber = () => {
+  const date = new Date()
+  const dateStr = date.getFullYear().toString() +
+    String(date.getMonth() + 1).padStart(2, '0') +
+    String(date.getDate()).padStart(2, '0')
+  const random = Math.floor(1000 + Math.random() * 9000)
+  return `FM-${dateStr}-${random}`
+}
 
 const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const { currentUser } = useAuth();
@@ -18,23 +29,23 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   };
 
   const calculateGrade = (checklist) => {
-    if (checklist.physicalDamage === 'Yes' || 
-        (checklist.simSlot1 === 'Not Working' && checklist.simSlot2 === 'Not Working') ||
-        (checklist.earpieceSpeaker === 'Not Working' && checklist.loudspeaker === 'Not Working' && checklist.microphone === 'Not Working')) {
+    if (checklist.physicalDamage === 'Yes' ||
+      (checklist.simSlot1 === 'Not Working' && checklist.simSlot2 === 'Not Working') ||
+      (checklist.earpieceSpeaker === 'Not Working' && checklist.loudspeaker === 'Not Working' && checklist.microphone === 'Not Working')) {
       return 'D';
     }
 
     const notWorkingItems = Object.keys(checklist).filter(k => checklist[k] === 'Not Working');
-    
+
     if (checklist.displayReplaced === 'Yes' || checklist.whiteSpots === 'Yes' || notWorkingItems.length >= 4) {
       return 'C';
     }
 
     const bGradeAllowedItems = ['proximitySensor', 'powerButton', 'volumeButtons', 'frontCamera', 'rearCamera', 'bluetooth', 'wifi', 'mobileData', 'flashlight'];
     const hasCriticalNotWorking = notWorkingItems.some(item => !bGradeAllowedItems.includes(item));
-    
+
     if (hasCriticalNotWorking) {
-        return 'C'; 
+      return 'C';
     }
 
     if (notWorkingItems.length >= 1 && notWorkingItems.length <= 3) {
@@ -50,7 +61,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
     const autoGrade = base.gradeAutoCalculated || calculateGrade(checklist);
     const manualOverride = base.gradeManualOverride || false;
     const initialCondition = base.condition || (manualOverride ? base.condition : autoGrade);
-    
+
     return {
       brand: base.brand || '',
       customBrand: base.customBrand || '',
@@ -88,7 +99,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState({});
   const [error, setError] = useState('');
-  
+
   const [customers, setCustomers] = useState([]);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCust, setNewCust] = useState({ name: '', phone: '', idType: 'Aadhaar', idNumber: '' });
@@ -97,7 +108,10 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const [assignedLabelNumber, setAssignedLabelNumber] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [localId, setLocalId] = useState(initialData?.id || null);
-  const [saveStatus, setSaveStatus] = useState('idle'); // idle, saving, saved
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [customModel, setCustomModel] = useState('');
+  const [isCustomModel, setIsCustomModel] = useState(false);
 
   useEffect(() => {
     if (localId) {
@@ -134,7 +148,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   };
 
   const handleSaveNewCustomer = async () => {
-    if(!newCust.name || !newCust.phone) return alert('Name and phone required');
+    if (!newCust.name || !newCust.phone) return alert('Name and phone required');
     setSavingCustomer(true);
     try {
       const docRef = await addDoc(collection(db, 'customers'), {
@@ -148,16 +162,16 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
       handleCustomerSelect(c);
       setShowNewCustomer(false);
       setNewCust({ name: '', phone: '', idType: 'Aadhaar', idNumber: '' });
-    } catch(err) {
+    } catch (err) {
       alert(err.message);
     } finally {
       setSavingCustomer(false);
     }
   };
 
-  const BRANDS = ['Samsung', 'Apple', 'Xiaomi', 'Realme', 'OPPO', 'Vivo', 'OnePlus', 'Nokia', 'Other'];
-  const RAM_OPTIONS = ['2GB', '3GB', '4GB', '6GB', '8GB', '12GB', '16GB'];
-  const ROM_OPTIONS = ['16GB', '32GB', '64GB', '128GB', '256GB', '512GB', '1TB'];
+  const { brands: brandOptions = [], models: modelOptions = {}, ramOptions = [], romOptions = [] } = useSettings();
+  const BRANDS = brandOptions;
+  const MODELS = modelOptions;
 
   const group1 = [
     { key: 'frontCamera', label: 'Front Camera' },
@@ -184,30 +198,12 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
 
   const handleUploadPhoto = async (file, fieldName) => {
     if (!file) return;
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-    
-    if (!cloudName || !uploadPreset || cloudName.includes('paste_')) {
-      setError("Cloudinary configuration missing in .env");
-      return;
-    }
 
     setUploadingPhotos(prev => ({ ...prev, [fieldName]: true }));
-    const data = new FormData();
-    data.append('file', file);
-    data.append('upload_preset', uploadPreset);
 
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: data,
-      });
-      const fileData = await res.json();
-      if (fileData.secure_url) {
-        setFormData(prev => ({ ...prev, [fieldName]: fileData.secure_url }));
-      } else {
-        throw new Error(fileData.error?.message || 'Upload failed');
-      }
+      const url = await uploadImageToCloudinary(file);
+      setFormData(prev => ({ ...prev, [fieldName]: url }));
     } catch (err) {
       console.error(err);
       setError('Image upload failed: ' + err.message);
@@ -218,11 +214,11 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
 
   const removePhoto = (fieldName) => setFormData(prev => ({ ...prev, [fieldName]: '' }));
 
-  const handleConditionChange = (e) => {
+  const handleConditionChange = (conditionGrade) => {
     setFormData({
       ...formData,
-      condition: e.target.value,
-      conditionDetails: {}, // reset details when condition changes
+      condition: conditionGrade,
+      conditionDetails: {},
       gradeManualOverride: true
     });
   };
@@ -255,17 +251,93 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
         finalData.brand = finalData.customBrand;
       }
       delete finalData.customBrand;
-      
+
       if (localId) {
         finalData.id = localId;
       }
-      
+
       const newId = await onSave(finalData);
       if (newId) setLocalId(newId);
       setSaveStatus('saved');
     } catch (err) {
       setError(err.message);
       setSaveStatus('idle');
+    }
+  };
+
+  const handleSaveAndPrint = async () => {
+    if (!formData.photo1Url) {
+      setError("Photo 1 (Front) is required.");
+      return;
+    }
+    setIsProcessing(true);
+    setError('');
+    try {
+      const finalSerialNumber = formData.serialNumber || generateSerialNumber();
+      setFormData(prev => ({ ...prev, serialNumber: finalSerialNumber }));
+
+      const finalData = { ...formData, serialNumber: finalSerialNumber, createdBy: currentUser.uid };
+      if (finalData.brand === 'Other') {
+        finalData.brand = finalData.customBrand;
+      }
+      delete finalData.customBrand;
+
+      if (localId) {
+        finalData.id = localId;
+      }
+
+      const savedDocId = await onSave(finalData);
+      if (savedDocId) setLocalId(savedDocId);
+
+      const nextLabel = await getLabelNumber();
+      const labelData = {
+        labelNumber: nextLabel,
+        labelType: "second_hand",
+        referenceId: savedDocId || localId,
+        assignedBy: currentUser.uid,
+        assignedAt: new Date().toISOString(),
+        isActive: true,
+        data: {
+          brand: finalData.brand,
+          model: finalData.model,
+          ram: finalData.ram,
+          rom: finalData.rom,
+          grade: finalData.condition,
+          imei1: finalData.imei1,
+          imei2: finalData.imei2,
+          serialNumber: finalSerialNumber,
+          salePrice: finalData.salePrice,
+          purchasePrice: finalData.purchasePrice,
+          condition: finalData.condition,
+          purchaseDate: finalData.purchaseDate,
+          supplier: finalData.supplier,
+          specialNotes: finalData.notes || '',
+          status: "available",
+          createdBy: currentUser.uid,
+          createdAt: new Date().toISOString()
+        }
+      };
+
+      await setDoc(doc(db, "label_registry", nextLabel.toString()), labelData);
+
+      await updateDoc(doc(db, "second_hand_mobiles", savedDocId || localId), {
+        assignedLabelNumber: nextLabel
+      });
+
+      await printLabel({
+        labelType: "second_hand",
+        labelNumber: nextLabel,
+        data: labelData.data
+      });
+
+      setSaveStatus(`Saved & Label #${nextLabel} Assigned ✓`);
+      setLabelAssigned(true);
+      setAssignedLabelNumber(nextLabel);
+    } catch (error) {
+      console.error("Save & Print error:", error);
+      alert("Error during Save & Print. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -296,7 +368,6 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
 
   const handlePrintLabel = () => {
     if (labelAssigned && assignedLabelNumber) {
-      // Print with assigned label number
       printLabel({
         labelType: 'second_hand',
         labelNumber: assignedLabelNumber,
@@ -312,7 +383,6 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
         }
       });
     } else {
-      // Print without assigned label — use IMEI1 as barcode
       printLabel({
         labelType: 'second_hand',
         labelNumber: null,
@@ -330,333 +400,415 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
     }
   };
 
+  const inputClass = "border border-[#e2e8f0] focus:border-[#002395] focus:ring-2 focus:ring-[#002395]/20 rounded-lg px-4 py-2.5 w-full outline-none transition text-[#0f172a] text-sm";
+  const labelClass = "block text-sm font-medium text-[#0f172a] mb-1";
+
+  const sectionHeaderClass = "border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase tracking-wide mb-4";
+
   const renderPhotoUpload = (label, fieldName, isRequired = false) => (
-    <div className="border border-gray-200 rounded p-3 bg-white">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label} {isRequired && <span className="text-red-500">*</span>}
+    <div>
+      <label className={labelClass}>
+        {label} {isRequired && <span className="text-[#ED2939]">*</span>}
       </label>
       {formData[fieldName] ? (
-        <div className="relative">
-          <img src={formData[fieldName]} alt={label} className="h-32 w-full object-cover rounded shadow-sm border" />
-          <button type="button" onClick={() => removePhoto(fieldName)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center hover:bg-red-600 shadow text-xs">
-            ✕
+        <div className="relative rounded-xl overflow-hidden h-32 border border-[#e2e8f0]">
+          <img src={formData[fieldName]} alt={label} className="h-full w-full object-cover" />
+          <button type="button" onClick={() => removePhoto(fieldName)} className="absolute top-2 right-2 bg-[#ED2939] text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 shadow-md text-xs transition">
+            <i className="fas fa-times"></i>
           </button>
         </div>
       ) : (
-        <div>
-          <input type="file" accept="image/*" onChange={e => handleUploadPhoto(e.target.files[0], fieldName)} className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-          {uploadingPhotos[fieldName] && <span className="text-sm text-blue-600 block mt-1">Uploading...</span>}
+        <div className="space-y-2">
+          <div className="flex gap-2 mt-1">
+            <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#002395]/30 bg-[#002395]/5 rounded-xl h-28 cursor-pointer active:scale-95 transition">
+              <i className="fas fa-camera text-[#002395] text-lg mb-0.5"></i>
+              <span className="text-xs text-[#002395] font-medium">Camera</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={e => handleUploadPhoto(e.target.files[0], fieldName)}
+                className="hidden"
+              />
+            </label>
+            <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl h-28 cursor-pointer active:scale-95 transition">
+              <i className="fas fa-images text-gray-500 text-lg mb-0.5"></i>
+              <span className="text-xs text-gray-500 font-medium">Gallery</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => handleUploadPhoto(e.target.files[0], fieldName)}
+                className="hidden"
+              />
+            </label>
+          </div>
+          {uploadingPhotos[fieldName] && <span className="text-xs text-[#002395] font-bold">Uploading...</span>}
         </div>
       )}
     </div>
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pb-8">
-      {error && <div className="text-red-600 bg-red-100 p-3 rounded">{error}</div>}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="md:col-span-2 mt-2">
-          <h4 className="font-semibold text-gray-700 border-b pb-2 mb-4">Seller Details</h4>
-          <CustomerAutocomplete
-            customers={customers}
-            nameValue={formData.sellerName}
-            phoneValue={formData.sellerPhone}
-            onNameChange={val => setFormData({...formData, sellerName: val})}
-            onPhoneChange={val => setFormData({...formData, sellerPhone: val})}
-            onSelectCustomer={handleCustomerSelect}
-          />
-          <div className="mt-2 text-sm text-gray-600 flex items-center justify-between">
-            <span>Can't find the seller?</span>
-            <button type="button" onClick={() => setShowNewCustomer(!showNewCustomer)} className="text-indigo-600 font-medium hover:underline">
-              {showNewCustomer ? 'Cancel Adding New' : '+ Add New Customer'}
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+      <div className="bg-white w-full md:max-w-2xl md:mx-auto rounded-t-3xl md:rounded-2xl flex flex-col max-h-[90vh]">
+
+        {/* Handle bar */}
+        <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+        </div>
+
+        {/* Fixed header */}
+        <div className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-gray-100 bg-white rounded-t-3xl md:rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-[#0f172a]">
+              {initialData ? 'Edit Mobile' : 'Add Second-Hand Mobile'}
+            </h2>
+            <button type="button" onClick={onCancel} className="text-gray-400 p-1">
+              <i className="fas fa-times text-lg"></i>
             </button>
           </div>
-          {showNewCustomer && (
-            <div className="mt-3 p-4 bg-indigo-50 border border-indigo-100 rounded-md grid grid-cols-1 md:grid-cols-2 gap-4">
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* SELLER DETAILS */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Seller Details
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <CustomerAutocomplete
+                  customers={customers}
+                  nameValue={formData.sellerName}
+                  phoneValue={formData.sellerPhone}
+                  alternatePhoneValue={formData.sellerAlternatePhone}
+                  onNameChange={val => setFormData({ ...formData, sellerName: val })}
+                  onPhoneChange={val => setFormData({ ...formData, sellerPhone: val })}
+                  onAlternatePhoneChange={val => setFormData({ ...formData, sellerAlternatePhone: val })}
+                  onSelectCustomer={handleCustomerSelect}
+                />
+                <div className="mt-2 text-sm flex items-center justify-between">
+                  <span className="text-[#64748b]">Can't find the seller?</span>
+                  <button type="button" onClick={() => setShowNewCustomer(!showNewCustomer)} className="text-[#002395] font-bold hover:underline">
+                    {showNewCustomer ? 'Cancel Adding New' : '+ Add New Customer'}
+                  </button>
+                </div>
+              </div>
+
+              {showNewCustomer && (
+                <div className="md:col-span-2 p-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Name <span className="text-[#ED2939]">*</span></label>
+                    <input type="text" value={newCust.name} onChange={e => setNewCust({ ...newCust, name: e.target.value })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Phone <span className="text-[#ED2939]">*</span></label>
+                    <input type="tel" inputMode="tel" pattern="[0-9]*" value={newCust.phone} onChange={e => setNewCust({ ...newCust, phone: e.target.value })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>ID Type</label>
+                    <select value={newCust.idType} onChange={e => setNewCust({ ...newCust, idType: e.target.value })} className={inputClass}>
+                      <option>Aadhaar</option>
+                      <option>PAN</option>
+                      <option>Driving License</option>
+                      <option>Voter ID</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>ID Number</label>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={newCust.idNumber} onChange={e => setNewCust({ ...newCust, idNumber: e.target.value })} className={inputClass} />
+                  </div>
+                  <div className="md:col-span-2 flex justify-end mt-2">
+                    <button type="button" onClick={handleSaveNewCustomer} disabled={savingCustomer} className="bg-[#002395] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#001a7a] transition disabled:opacity-50">
+                      {savingCustomer ? 'Saving...' : 'Save & Select Customer'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* DEVICE DETAILS */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Device Details
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700">Name *</label>
-                <input type="text" value={newCust.name} onChange={e => setNewCust({...newCust, name: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm" />
+                <label className={labelClass}>Brand <span className="text-[#ED2939]">*</span></label>
+                <select required value={formData.brand} onChange={e => {
+                  const selectedBrand = e.target.value
+                  setFormData(prev => ({ ...prev, brand: selectedBrand, model: '' }))
+                  setCustomModel('')
+                  setIsCustomModel(false)
+                }} className={inputClass}>
+                  <option value="">Select Brand</option>
+                  {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                {formData.brand === 'Other' && (
+                  <input type="text" placeholder="Enter Custom Brand" required value={formData.customBrand || ''} onChange={e => setFormData({ ...formData, customBrand: e.target.value })} className={`${inputClass} mt-3`} />
+                )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700">Phone *</label>
-                <input type="text" value={newCust.phone} onChange={e => setNewCust({...newCust, phone: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm" />
+                <label className={labelClass}>Model <span className="text-[#ED2939]">*</span></label>
+                <select
+                  required
+                  value={isCustomModel ? '__custom__' : formData.model}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setIsCustomModel(true)
+                      setFormData(prev => ({ ...prev, model: '' }))
+                    } else {
+                      setIsCustomModel(false)
+                      setCustomModel('')
+                      setFormData(prev => ({ ...prev, model: e.target.value }))
+                    }
+                  }}
+                  disabled={!formData.brand}
+                  className={inputClass}
+                >
+                  <option value="" disabled>{formData.brand ? 'Select model' : 'Select brand first'}</option>
+                  {formData.brand && (MODELS[formData.brand] || []).length === 0 && (
+                    <option value="" disabled>No models available</option>
+                  )}
+                  {(MODELS[formData.brand] || []).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                  <option value="__custom__">Other (type manually)</option>
+                </select>
+                {isCustomModel && (
+                  <input
+                    type="text"
+                    placeholder="Type model name"
+                    value={customModel}
+                    onChange={e => {
+                      setCustomModel(e.target.value)
+                      setFormData(prev => ({ ...prev, model: e.target.value }))
+                    }}
+                    className={`${inputClass} mt-2`}
+                  />
+                )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700">ID Type</label>
-                <select value={newCust.idType} onChange={e => setNewCust({...newCust, idType: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
-                  <option>Aadhaar</option>
-                  <option>PAN</option>
-                  <option>Driving License</option>
-                  <option>Voter ID</option>
-                  <option>Other</option>
+                <label className={labelClass}>RAM <span className="text-[#ED2939]">*</span></label>
+                <select required value={formData.ram} onChange={e => setFormData({ ...formData, ram: e.target.value })} className={inputClass}>
+                  <option value="">Select RAM</option>
+                  {ramOptions.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700">ID Number</label>
-                <input type="text" value={newCust.idNumber} onChange={e => setNewCust({...newCust, idNumber: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm" />
-              </div>
-              <div className="md:col-span-2 flex justify-end">
-                <button type="button" onClick={handleSaveNewCustomer} disabled={savingCustomer} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50 hover:bg-indigo-700">
-                  {savingCustomer ? 'Saving...' : 'Save & Select'}
-                </button>
+                <label className={labelClass}>ROM <span className="text-[#ED2939]">*</span></label>
+                <select required value={formData.rom} onChange={e => setFormData({ ...formData, rom: e.target.value })} className={inputClass}>
+                  <option value="">Select ROM</option>
+                  {romOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="md:col-span-2 mt-4"><h4 className="font-semibold text-gray-700 border-b pb-2">Device Info</h4></div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Brand *</label>
-          <select required value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="">Select Brand</option>
-            {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-          {formData.brand === 'Other' && (
-            <input type="text" placeholder="Enter Custom Brand" required value={formData.customBrand || ''} onChange={e => setFormData({...formData, customBrand: e.target.value})} className="mt-2 block w-full border border-gray-300 rounded-md p-2" />
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Model *</label>
-          <input type="text" required list="model-list" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-          <datalist id="model-list">
-            <option value="Galaxy S23" />
-            <option value="iPhone 14" />
-            <option value="iPhone 13" />
-            <option value="Redmi Note 12" />
-          </datalist>
-        </div>
+          {/* PRICING */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Pricing &amp; Purchase Info
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Purchase Price <span className="text-[#ED2939]">*</span></label>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" required min="0" value={formData.purchasePrice} onChange={e => setFormData({ ...formData, purchasePrice: e.target.value })} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Sale Price <span className="text-[#ED2939]">*</span></label>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" required min="0" value={formData.salePrice} onChange={e => setFormData({ ...formData, salePrice: e.target.value })} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Purchase Date <span className="text-[#ED2939]">*</span></label>
+                <input type="date" required value={formData.purchaseDate} onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Supplier</label>
+                <input type="text" value={formData.supplier} onChange={e => setFormData({ ...formData, supplier: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">RAM *</label>
-          <select required value={formData.ram} onChange={e => setFormData({...formData, ram: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="">Select RAM</option>
-            {RAM_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">ROM *</label>
-          <select required value={formData.rom} onChange={e => setFormData({...formData, rom: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="">Select ROM</option>
-            {ROM_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
+          {/* IMEI & SERIAL */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              IMEI &amp; Serial
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <ImeiInput label="IMEI 1" value={formData.imei1} onChange={val => setFormData({ ...formData, imei1: val })} required={true} scannerId="scanner-secondhand-imei1" />
+              </div>
+              <div>
+                <ImeiInput label="IMEI 2 (optional)" value={formData.imei2} onChange={val => setFormData({ ...formData, imei2: val })} scannerId="scanner-secondhand-imei2" />
+              </div>
+              <div>
+                <label className={labelClass}>
+                  Serial Number {formData.brand === 'Apple' && <span className="text-[#ED2939]">*</span>}
+                </label>
+                <input type="text" value={formData.serialNumber} onChange={e => setFormData({ ...formData, serialNumber: e.target.value })} required={formData.brand === 'Apple'} placeholder="Enter serial number" className={inputClass} />
+                {formData.brand === 'Apple' && (
+                  <p className="text-xs text-[#002395] mt-1 font-semibold">Required for Apple devices</p>
+                )}
+              </div>
+            </div>
+          </div>
 
-        <div>
-          <ImeiInput
-            label="IMEI 1"
-            value={formData.imei1}
-            onChange={val => setFormData({...formData, imei1: val})}
-            required={true}
-            scannerId="scanner-secondhand-imei1"
-          />
-        </div>
-        <div>
-          <ImeiInput
-            label="IMEI 2 (optional)"
-            value={formData.imei2}
-            onChange={val => setFormData({...formData, imei2: val})}
-            scannerId="scanner-secondhand-imei2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Serial Number {formData.brand === 'Apple' && <span className="text-red-500">*</span>}
-          </label>
-          <input
-            type="text"
-            value={formData.serialNumber}
-            onChange={e => setFormData({...formData, serialNumber: e.target.value})}
-            required={formData.brand === 'Apple'}
-            placeholder="Enter serial number (especially for iPhones)"
-            className={`mt-1 block w-full border rounded-md p-2 ${
-              formData.brand === 'Apple'
-                ? 'border-blue-500 ring-1 ring-blue-400 focus:ring-blue-500'
-                : 'border-gray-300'
-            }`}
-          />
-          {formData.brand === 'Apple' && (
-            <p className="text-xs text-blue-600 mt-1">Required for Apple devices</p>
-          )}
-        </div>
-        <div /> {/* Empty cell to maintain 2-column grid */}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Purchase Price *</label>
-          <input type="number" required min="0" value={formData.purchasePrice} onChange={e => setFormData({...formData, purchasePrice: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Sale Price *</label>
-          <input type="number" required min="0" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Purchase Date *</label>
-          <input type="date" required value={formData.purchaseDate} onChange={e => setFormData({...formData, purchaseDate: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Supplier</label>
-          <input type="text" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-
-        <div className="md:col-span-2 mt-6">
-          <h4 className="font-semibold text-gray-700 border-b pb-2 mb-4">Device Condition Check</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
-            <div className="space-y-4">
-              <h5 className="font-medium text-gray-600 mb-2">Functionality Checks</h5>
-              {group1.map(item => (
-                <div key={item.key} className="flex justify-between items-center border-b border-gray-100 pb-2">
-                  <span className="text-sm text-gray-700">{item.label}</span>
-                  <div className="flex space-x-2">
-                    <button type="button" onClick={() => handleChecklistChange(item.key, 'Working')} className={`px-3 py-1 text-xs font-medium rounded-full ${formData.conditionChecklist[item.key] === 'Working' ? 'bg-green-100 text-green-800 border-green-300 border' : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'}`}>Working</button>
-                    <button type="button" onClick={() => handleChecklistChange(item.key, 'Not Working')} className={`px-3 py-1 text-xs font-medium rounded-full ${formData.conditionChecklist[item.key] === 'Not Working' ? 'bg-red-100 text-red-800 border-red-300 border' : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'}`}>Not Working</button>
-                  </div>
+          {/* CONDITION & GRADE */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Condition &amp; Grade
+            </p>
+            <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 md:p-6 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h5 className="font-bold text-[#0f172a] mb-3 text-sm">Functionality Checks</h5>
+                  {group1.map(item => (
+                    <div key={item.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2.5 border-b border-[#e2e8f0] last:border-0">
+                      <span className="text-sm font-medium text-[#0f172a] flex-1">{item.label}</span>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button type="button" onClick={() => handleChecklistChange(item.key, 'Working')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'Working' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>Working</button>
+                        <button type="button" onClick={() => handleChecklistChange(item.key, 'Not Working')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'Not Working' ? 'bg-red-100 text-[#ED2939] border border-red-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>Not Working</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="space-y-4">
-              <h5 className="font-medium text-gray-600 mb-2">Physical Checks</h5>
-              {group2.map(item => (
-                <div key={item.key} className="flex justify-between items-center border-b border-gray-100 pb-2">
-                  <span className="text-sm text-gray-700">{item.label}</span>
-                  <div className="flex space-x-2">
-                    <button type="button" onClick={() => handleChecklistChange(item.key, 'Yes')} className={`px-3 py-1 text-xs font-medium rounded-full ${formData.conditionChecklist[item.key] === 'Yes' ? 'bg-red-100 text-red-800 border-red-300 border' : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'}`}>Yes</button>
-                    <button type="button" onClick={() => handleChecklistChange(item.key, 'No')} className={`px-3 py-1 text-xs font-medium rounded-full ${formData.conditionChecklist[item.key] === 'No' ? 'bg-green-100 text-green-800 border-green-300 border' : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'}`}>No</button>
-                  </div>
+                <div className="space-y-4">
+                  <h5 className="font-bold text-[#0f172a] mb-3 text-sm">Physical Checks</h5>
+                  {group2.map(item => (
+                    <div key={item.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2.5 border-b border-[#e2e8f0] last:border-0">
+                      <span className="text-sm font-medium text-[#0f172a] flex-1">{item.label}</span>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button type="button" onClick={() => handleChecklistChange(item.key, 'Yes')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'Yes' ? 'bg-red-100 text-[#ED2939] border border-red-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>Yes</button>
+                        <button type="button" onClick={() => handleChecklistChange(item.key, 'No')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'No' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>No</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className={labelClass}>Final Grade Assignment</label>
+              <div className="grid grid-cols-4 gap-2 md:gap-4 mt-2">
+                {['A', 'B', 'C', 'D'].map(grade => (
+                  <button key={grade} type="button" onClick={() => handleConditionChange(grade)}
+                    className={`py-3 rounded-xl font-bold text-center border-2 transition ${formData.condition === grade
+                      ? grade === 'A' ? 'bg-green-500 border-green-500 text-white' :
+                        grade === 'B' ? 'bg-blue-500 border-blue-500 text-white' :
+                        grade === 'C' ? 'bg-orange-500 border-orange-500 text-white' :
+                        'bg-[#ED2939] border-[#ED2939] text-white'
+                      : 'bg-white border-[#e2e8f0] text-[#64748b] hover:border-[#002395]'
+                    }`}>
+                    Grade {grade}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-[#64748b] mt-2 font-medium">
+                {formData.gradeManualOverride ? '* Grade was manually overridden' : '* Grade auto-calculated from checklist'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {formData.condition === 'A' && (
+                <>
+                  <div><label className={labelClass}>Warranty Expiry</label><input type="date" value={formData.conditionDetails.warrantyExpiry || ''} onChange={e => setFormData({ ...formData, conditionDetails: { ...formData.conditionDetails, warrantyExpiry: e.target.value } })} className={inputClass} /></div>
+                  <div><label className={labelClass}>Accessories Included</label><input type="text" value={formData.conditionDetails.accessories || ''} onChange={e => setFormData({ ...formData, conditionDetails: { ...formData.conditionDetails, accessories: e.target.value } })} className={inputClass} /></div>
+                </>
+              )}
+              {formData.condition === 'B' && (
+                <div className="md:col-span-2"><label className={labelClass}>Description of Wear</label><textarea required value={formData.conditionDetails.wearDescription || ''} onChange={e => setFormData({ ...formData, conditionDetails: { ...formData.conditionDetails, wearDescription: e.target.value } })} className={inputClass}></textarea></div>
+              )}
+              {formData.condition === 'C' && (
+                <div className="md:col-span-2"><label className={labelClass}>Description of Condition</label><textarea required value={formData.conditionDetails.conditionDescription || ''} onChange={e => setFormData({ ...formData, conditionDetails: { ...formData.conditionDetails, conditionDescription: e.target.value } })} className={inputClass}></textarea></div>
+              )}
+              {formData.condition === 'D' && (
+                <div className="md:col-span-2"><label className={labelClass}>Description of Damage</label><textarea required value={formData.conditionDetails.damageDescription || ''} onChange={e => setFormData({ ...formData, conditionDetails: { ...formData.conditionDetails, damageDescription: e.target.value } })} className={inputClass}></textarea></div>
+              )}
+              <div className="md:col-span-2">
+                <label className={labelClass}>Special features / notes</label>
+                <textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} className={inputClass} rows="2"></textarea>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="md:col-span-2 mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-          <div className="flex items-center space-x-3 mb-2">
-            <label className="block text-sm font-medium text-gray-700">Calculated Grade:</label>
-            <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-              formData.condition === 'A' ? 'bg-green-500 text-white' :
-              formData.condition === 'B' ? 'bg-blue-500 text-white' :
-              formData.condition === 'C' ? 'bg-orange-500 text-white' :
-              formData.condition === 'D' ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-800'
-            }`}>
-              {formData.condition || '-'}
-            </span>
-            <span className="text-xs text-gray-500 italic">
-              {formData.gradeManualOverride ? '(Manually set)' : '(Auto calculated — you can override below)'}
-            </span>
-          </div>
-          
-          <label className="block text-sm font-medium text-gray-700 mt-4">Override Condition (Optional)</label>
-          <select required value={formData.condition} onChange={handleConditionChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white">
-            <option value="">Select Condition</option>
-            <option value="A">A - In warranty (brand), full kit & bill</option>
-            <option value="B">B - Out of warranty (minor wear & tear)</option>
-            <option value="C">C - Out of warranty (worn-out condition)</option>
-            <option value="D">D - Crack/chipped/broken/parts missing</option>
-          </select>
-        </div>
-
-        {formData.condition === 'A' && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Warranty Expiry</label>
-              <input type="date" value={formData.conditionDetails.warrantyExpiry || ''} onChange={e => setFormData({...formData, conditionDetails: {...formData.conditionDetails, warrantyExpiry: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          {/* PHOTOS */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Photos
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {renderPhotoUpload('Front View', 'photo1Url', true)}
+              {renderPhotoUpload('Back View', 'photo2Url')}
+              {renderPhotoUpload('Left Side', 'photo3Url')}
+              {renderPhotoUpload('Right Side', 'photo4Url')}
+              {renderPhotoUpload('Top/Bottom', 'photo5Url')}
+              {renderPhotoUpload('Additional', 'photo6Url')}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Accessories Included</label>
-              <input type="text" value={formData.conditionDetails.accessories || ''} onChange={e => setFormData({...formData, conditionDetails: {...formData.conditionDetails, accessories: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3 mt-6">
+              ID Card Photos
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {renderPhotoUpload('ID Card Front', 'idCardFrontUrl')}
+              {renderPhotoUpload('ID Card Back', 'idCardBackUrl')}
             </div>
-          </>
-        )}
-
-        {formData.condition === 'B' && (
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Description of Wear</label>
-            <textarea required value={formData.conditionDetails.wearDescription || ''} onChange={e => setFormData({...formData, conditionDetails: {...formData.conditionDetails, wearDescription: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md p-2"></textarea>
           </div>
-        )}
 
-        {formData.condition === 'C' && (
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Description of Condition</label>
-            <textarea required value={formData.conditionDetails.conditionDescription || ''} onChange={e => setFormData({...formData, conditionDetails: {...formData.conditionDetails, conditionDescription: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md p-2"></textarea>
-          </div>
-        )}
-
-        {formData.condition === 'D' && (
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Description of Damage</label>
-            <textarea required value={formData.conditionDetails.damageDescription || ''} onChange={e => setFormData({...formData, conditionDetails: {...formData.conditionDetails, damageDescription: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md p-2"></textarea>
-          </div>
-        )}
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Special features / notes</label>
-          <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows="3"></textarea>
         </div>
 
-        <div className="md:col-span-2 mt-6">
-          <h4 className="font-semibold text-gray-700 border-b pb-2 mb-4">Mobile Photos</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {renderPhotoUpload('Photo 1: Front', 'photo1Url', true)}
-            {renderPhotoUpload('Photo 2: Back', 'photo2Url')}
-            {renderPhotoUpload('Photo 3: Left Side', 'photo3Url')}
-            {renderPhotoUpload('Photo 4: Right Side', 'photo4Url')}
-            {renderPhotoUpload('Photo 5: Top/Bottom', 'photo5Url')}
-            {renderPhotoUpload('Photo 6: Additional', 'photo6Url')}
-          </div>
-          
-          <h4 className="font-semibold text-gray-700 border-b pb-2 mt-8 mb-4">Document / ID Card Photos</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {renderPhotoUpload('Photo 7: ID Card Front', 'idCardFrontUrl')}
-            {renderPhotoUpload('Photo 8: ID Card Back / Doc', 'idCardBackUrl')}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col mt-6 pt-4 border-t">
-        {saveStatus === 'saved' && <div className="text-green-600 font-medium mb-3">Saved successfully</div>}
-        <div className="flex gap-3 flex-wrap items-center">
-          {saveStatus === 'saved' ? (
-            <button type="submit" disabled={Object.values(uploadingPhotos).some(v => v)} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700">
-              Saved ✓
-            </button>
-          ) : (
-            <button type="submit" disabled={saveStatus === 'saving' || Object.values(uploadingPhotos).some(v => v)} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 hover:bg-blue-700">
-              {saveStatus === 'saving' ? 'Saving...' : 'Save Mobile'}
-            </button>
-          )}
-          
-          {labelAssigned ? (
-            <button type="button" disabled className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold cursor-not-allowed">
-              Label #{assignedLabelNumber} ✓
-            </button>
-          ) : (
+        {/* Fixed footer */}
+        <div className="flex-shrink-0 px-4 py-3 border-t border-gray-100 bg-white space-y-2">
+          <div className="flex gap-3">
             <button
               type="button"
-              onClick={handleAssignLabel}
-              disabled={!localId || assigning}
-              className="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
+              onClick={onCancel}
+              className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-semibold"
             >
-              {assigning ? 'Assigning...' : 'Assign Label'}
+              {saveStatus === 'saved' || labelAssigned ? 'Done' : 'Cancel'}
             </button>
-          )}
-          
+            {saveStatus === 'saved' ? (
+              <button type="button" disabled className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-semibold opacity-50 cursor-not-allowed">
+                Saved <i className="fas fa-check ml-1"></i>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={saveStatus === 'saving' || Object.values(uploadingPhotos).some(v => v)}
+                className="flex-1 bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+              >
+                {saveStatus === 'saving' ? 'Saving...' : initialData ? 'Save Changes' : 'Add Mobile'}
+              </button>
+            )}
+          </div>
           <button
             type="button"
-            onClick={handlePrintLabel}
-            disabled={!localId}
-            className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700"
+            onClick={handleSaveAndPrint}
+            disabled={isProcessing || saveStatus.includes('Assigned ✓')}
+            className="w-full bg-green-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
           >
-            Print Label
-          </button>
-          
-          <button type="button" onClick={onCancel} className="px-4 py-2 border rounded-lg text-gray-700 bg-white hover:bg-gray-50 ml-auto font-medium">
-            {saveStatus === 'saved' || labelAssigned ? 'Done' : 'Cancel'}
+            {isProcessing ? (
+              <span><i className="fas fa-spinner fa-spin mr-2"></i>Processing...</span>
+            ) : saveStatus.includes('Assigned ✓') ? (
+              <span>Done ✓</span>
+            ) : (
+              <span><i className="fas fa-print mr-2"></i>Save &amp; Print Label</span>
+            )}
           </button>
         </div>
+
       </div>
-    </form>
+    </div>
   );
 };
 

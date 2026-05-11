@@ -30,6 +30,13 @@ const group2 = [
   { key: 'physicalDamage', label: 'Physical Damage / Bent' }
 ];
 
+const gradeColor = (g) => ({ 
+  A: 'bg-green-100 text-green-700', 
+  B: 'bg-blue-100 text-blue-700', 
+  C: 'bg-orange-100 text-orange-700', 
+  D: 'bg-red-100 text-red-700' 
+}[g] || 'bg-gray-100 text-[#64748b]');
+
 const SecondHandView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -98,199 +105,265 @@ const SecondHandView = () => {
     finally { setAssigningLabel(false); }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
-  if (!mobile) return <div className="p-8 text-center text-red-600">Mobile not found</div>;
+  if (loading) return <div className="p-4 md:p-8 text-center text-[#0f172a] font-bold">Loading...</div>;
+  if (!mobile) return <div className="p-4 md:p-8 text-center text-[#ED2939] font-bold">Mobile not found</div>;
 
   return (
-    <Layout title="Second-Hand Detail">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-4">
-            <button onClick={() => navigate('/inventory/second-hand')} className="flex items-center text-gray-500 hover:text-indigo-600 font-medium">
-              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>Back
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">{mobile.brand} {mobile.model}</h1>
-            <span className={`px-3 py-1 text-sm font-semibold rounded-full ${mobile.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-              {mobile.status?.toUpperCase()}
-            </span>
-          </div>
-          <div className="flex items-center space-x-3">
-            {labelEntry ? (
-              <>
-                <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-800 border border-green-300">
-                  🏷 Label: #{labelEntry.labelNumber}
-                </span>
-                <button onClick={() => printLabel(labelEntry)} className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center">
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                  Print
-                </button>
-              </>
-            ) : (
-              <button onClick={openLabelDialog} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-medium">
-                Assign Label Number
-              </button>
-            )}
-            <button onClick={() => setShowEdit(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Edit</button>
-          </div>
+    <Layout title="Second-Hand Detail" pageType="detail" backTo="/inventory/second-hand">
+      <div className="min-h-screen bg-[#f8fafc] pb-24">
+
+        {/* HEADER */}
+        <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-30 shadow-sm">
+          <button onClick={() => navigate('/inventory/second-hand')} className="text-[#002395] p-1">
+            <i className="fas fa-arrow-left text-lg"></i>
+          </button>
+          <h1 className="text-lg font-bold text-[#0f172a] flex-1">Mobile Details</h1>
         </div>
 
-        <div className="bg-white shadow sm:rounded-lg mb-8">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Device Details</h3>
-          </div>
-          <div className="px-4 py-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <dl className="space-y-4">
-              <div><dt className="text-sm font-medium text-gray-500">Brand</dt><dd className="mt-1 text-sm text-gray-900">{mobile.brand}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Model</dt><dd className="mt-1 text-sm text-gray-900">{mobile.model}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Config</dt><dd className="mt-1 text-sm text-gray-900">{mobile.ram} / {mobile.rom}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">IMEI 1</dt><dd className="mt-1 text-sm text-gray-900">{mobile.imei1}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">IMEI 2</dt><dd className="mt-1 text-sm text-gray-900">{mobile.imei2 || '-'}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Serial Number</dt><dd className="mt-1 text-sm text-gray-900">{mobile.serialNumber || 'Not provided'}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Condition</dt><dd className="mt-1 text-sm text-gray-900">Grade {mobile.condition}</dd></div>
-            </dl>
-            <dl className="space-y-4">
-              <div><dt className="text-sm font-medium text-gray-500">Purchase Price</dt><dd className="mt-1 text-sm font-semibold text-red-600">₹{mobile.purchasePrice}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Sale Price</dt><dd className="mt-1 text-sm font-semibold text-green-600">₹{mobile.salePrice}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Purchase Date</dt><dd className="mt-1 text-sm text-gray-900">{mobile.purchaseDate ? new Date(mobile.purchaseDate).toLocaleDateString() : '-'}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Supplier</dt><dd className="mt-1 text-sm text-gray-900">{mobile.supplier || '-'}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Notes</dt><dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{mobile.notes || '-'}</dd></div>
-            </dl>
-          </div>
+        <div className="px-4 py-4 space-y-4">
 
-          {/* Condition Checklist Section */}
-          {mobile.conditionChecklist && (
-            <div className="px-4 py-5 sm:p-6 bg-white border-t border-gray-200">
-              <div className="flex items-center space-x-3 mb-4 border-b pb-2">
-                <h3 className="text-lg font-medium text-gray-900">Condition Checklist</h3>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${mobile.condition === 'A' ? 'bg-green-500 text-white' :
-                  mobile.condition === 'B' ? 'bg-blue-500 text-white' :
-                    mobile.condition === 'C' ? 'bg-orange-500 text-white' :
-                      mobile.condition === 'D' ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-800'
+          {/* MAIN CARD */}
+          <div className={`bg-white rounded-2xl shadow-sm border-l-4 p-5 ${
+            mobile?.condition === 'A' ? 'border-green-500' :
+            mobile?.condition === 'B' ? 'border-[#002395]' :
+            mobile?.condition === 'C' ? 'border-orange-500' :
+            'border-[#ED2939]'
+          }`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-[#0f172a]">
+                  {mobile?.brand} {mobile?.model}
+                </h2>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {mobile?.ram && (
+                    <span className="bg-[#002395]/10 text-[#002395] text-xs px-2 py-0.5 rounded-full">
+                      {mobile?.ram} RAM
+                    </span>
+                  )}
+                  {mobile?.rom && (
+                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                      {mobile?.rom} ROM
+                    </span>
+                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${gradeColor(mobile?.condition)}`}>
+                    Grade {mobile?.condition}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    mobile?.status === 'available' || !mobile?.status
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
                   }`}>
-                  Grade {mobile.condition}
-                </span>
-                <span className="text-xs text-gray-500 italic bg-gray-100 px-2 py-0.5 rounded">
-                  {mobile.gradeManualOverride ? 'Manually set' : 'Auto calculated'}
-                </span>
+                    {mobile?.status === 'available' || !mobile?.status ? 'Available' : 'Sold'}
+                  </span>
+                  {labelEntry && (
+                    <span className="bg-[#002395]/10 text-[#002395] text-xs px-2 py-0.5 rounded-full font-bold">
+                      <i className="fas fa-tag mr-1"></i>Label #{labelEntry.labelNumber}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Functionality</h4>
-                  <ul className="space-y-2">
-                    {group1.map(item => (
-                      <li key={item.key} className="flex justify-between items-center text-sm py-1 border-b border-gray-50 last:border-0">
-                        <span className="text-gray-700">{item.label}</span>
-                        {mobile.conditionChecklist[item.key] === 'Working' ? (
-                          <span className="text-green-600 font-medium flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>Working
-                          </span>
-                        ) : (
-                          <span className="text-red-600 font-medium flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>Not Working
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Physical Condition</h4>
-                  <ul className="space-y-2">
-                    {group2.map(item => (
-                      <li key={item.key} className="flex justify-between items-center text-sm py-1 border-b border-gray-50 last:border-0">
-                        <span className="text-gray-700">{item.label}</span>
-                        {mobile.conditionChecklist[item.key] === 'No' ? (
-                          <span className="text-green-600 font-medium flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>No
-                          </span>
-                        ) : (
-                          <span className="text-red-600 font-medium flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>Yes
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-[#002395]">₹{mobile?.salePrice}</p>
+                {mobile?.purchasePrice && (
+                  <p className="text-xs text-gray-400">Cost: ₹{mobile?.purchasePrice}</p>
+                )}
               </div>
             </div>
-          )}
 
-          {mobile.sellerCustomerId && (
-            <div className="px-4 py-5 sm:px-6 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+            {/* ACTION BUTTONS */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowEdit(true)}
+                className="flex items-center gap-1.5 bg-[#002395]/10 text-[#002395] px-3 py-2 rounded-xl text-xs font-semibold"
+              >
+                <i className="fas fa-edit"></i> Edit
+              </button>
+              {labelEntry ? (
+                <button
+                  onClick={() => printLabel(labelEntry)}
+                  className="flex items-center gap-1.5 bg-[#ED2939]/10 text-[#ED2939] px-3 py-2 rounded-xl text-xs font-semibold"
+                >
+                  <i className="fas fa-print"></i> Print #{labelEntry.labelNumber}
+                </button>
+              ) : (
+                <button
+                  onClick={openLabelDialog}
+                  className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-xs font-semibold"
+                >
+                  <i className="fas fa-tag"></i> Assign Label
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* DEVICE INFO */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Device Info
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {mobile?.imei1 && (
+                <div>
+                  <p className="text-xs text-gray-400">IMEI 1</p>
+                  <p className="font-semibold text-[#0f172a] text-sm break-all">{mobile?.imei1}</p>
+                </div>
+              )}
+              {mobile?.imei2 && (
+                <div>
+                  <p className="text-xs text-gray-400">IMEI 2</p>
+                  <p className="font-semibold text-[#0f172a] text-sm break-all">{mobile?.imei2}</p>
+                </div>
+              )}
+              {mobile?.serialNumber && (
+                <div>
+                  <p className="text-xs text-gray-400">Serial Number</p>
+                  <p className="font-semibold text-[#0f172a] text-sm break-all">{mobile?.serialNumber}</p>
+                </div>
+              )}
+              {mobile?.purchaseDate && (
+                <div>
+                  <p className="text-xs text-gray-400">Purchase Date</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{mobile?.purchaseDate}</p>
+                </div>
+              )}
+              {mobile?.supplier && (
+                <div>
+                  <p className="text-xs text-gray-400">Supplier</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{mobile?.supplier}</p>
+                </div>
+              )}
+            </div>
+            {mobile?.notes && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-400 mb-1">Notes</p>
+                <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3">{mobile?.notes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* CONDITION CHECKLIST */}
+          {mobile?.conditionChecklist && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Device Checklist
+              </p>
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-widest">Functionality</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {group1.map(item => (
+                    <div key={item.key} className="flex items-center gap-2">
+                      <i className={`fas ${
+                        mobile.conditionChecklist[item.key] === 'Working'
+                          ? 'fa-check-circle text-green-500'
+                          : 'fa-times-circle text-[#ED2939]'
+                      } text-sm`}></i>
+                      <span className="text-xs text-gray-600">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">Seller Details</h3>
-                <p className="text-sm text-gray-600">
-                  <span className="font-semibold text-gray-800">{mobile.sellerName}</span>
-                  {mobile.sellerPhone && <span className="ml-2">({mobile.sellerPhone})</span>}
-                </p>
+                <h4 className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-widest">Physical Condition</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {group2.map(item => (
+                    <div key={item.key} className="flex items-center gap-2">
+                      <i className={`fas ${
+                        mobile.conditionChecklist[item.key] === 'No'
+                          ? 'fa-check-circle text-green-500'
+                          : 'fa-exclamation-circle text-[#ED2939]'
+                      } text-sm`}></i>
+                      <span className="text-xs text-gray-600">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <Link to={`/customers/${mobile.sellerCustomerId}`} className="text-indigo-600 hover:text-indigo-900 bg-white border border-gray-300 px-3 py-1.5 rounded text-sm font-medium shadow-sm">
-                View Profile
-              </Link>
             </div>
           )}
 
-          <div className="px-4 py-5 sm:p-6 bg-white border-t border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Photos & Documents</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+          {/* SELLER DETAILS */}
+          {mobile?.sellerCustomerId && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Seller Details
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-gray-400">Name</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{mobile?.sellerName}</p>
+                </div>
+                {mobile?.sellerPhone && (
+                  <div>
+                    <p className="text-xs text-gray-400">Phone</p>
+                    <p className="font-semibold text-[#0f172a] text-sm">{mobile?.sellerPhone}</p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => navigate(`/customers/${mobile?.sellerCustomerId}`)}
+                className="mt-3 text-xs text-[#002395] font-semibold"
+              >
+                <i className="fas fa-user mr-1"></i> View Customer Profile
+              </button>
+            </div>
+          )}
+
+          {/* PHOTOS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Photos &amp; Documents
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { label: 'Photo 1: Front', url: mobile.photo1Url || mobile.frontImageUrl },
-                { label: 'Photo 2: Back', url: mobile.photo2Url || mobile.backImageUrl },
-                { label: 'Photo 3: Left Side', url: mobile.photo3Url },
-                { label: 'Photo 4: Right Side', url: mobile.photo4Url },
-                { label: 'Photo 5: Top/Bottom', url: mobile.photo5Url },
-                { label: 'Photo 6: Additional', url: mobile.photo6Url },
-                { label: 'Photo 7: ID Card Front', url: mobile.idCardFrontUrl },
-                { label: 'Photo 8: ID Card Back / Doc', url: mobile.idCardBackUrl }
+                { label: 'Front View', url: mobile?.photo1Url || mobile?.frontImageUrl },
+                { label: 'Back View',  url: mobile?.photo2Url || mobile?.backImageUrl },
+                { label: 'Left Side',  url: mobile?.photo3Url },
+                { label: 'Right Side', url: mobile?.photo4Url },
+                { label: 'Top/Bottom', url: mobile?.photo5Url },
+                { label: 'Additional', url: mobile?.photo6Url },
+                { label: 'ID Front',   url: mobile?.idCardFrontUrl },
+                { label: 'ID Back',    url: mobile?.idCardBackUrl },
               ].map((img, idx) => (
-                <div key={idx}>
-                  <p className="text-sm font-medium text-gray-600 mb-2">{img.label}</p>
+                <div key={idx} className="flex flex-col">
                   {img.url ? (
-                    <a href={img.url} target="_blank" rel="noreferrer">
-                      <img src={img.url} alt={img.label} className="h-48 w-full object-contain rounded shadow-sm border border-gray-200 bg-gray-50 hover:opacity-90 transition-opacity" />
+                    <a href={img.url} target="_blank" rel="noreferrer" className="block w-full">
+                      <img src={img.url} alt={img.label} className="w-full aspect-square object-cover rounded-xl shadow-sm border border-[#e2e8f0] hover:opacity-90 transition" />
                     </a>
                   ) : (
-                    <div className="h-48 flex items-center justify-center bg-gray-50 text-gray-400 rounded border border-dashed border-gray-300 text-xs">No photo</div>
+                    <div className="w-full aspect-square flex items-center justify-center bg-[#f8fafc] text-[#64748b] rounded-xl border border-[#e2e8f0] border-dashed text-xs font-medium">No photo</div>
                   )}
+                  <p className="text-xs font-semibold text-[#64748b] mt-2 text-center">{img.label}</p>
                 </div>
               ))}
             </div>
           </div>
+
         </div>
 
+        {/* LABEL ASSIGNMENT MODAL */}
         {showLabelDialog && (
-          <div className="fixed z-50 inset-0 flex items-center justify-center">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowLabelDialog(false)}></div>
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 z-10">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Assign Label Number</h3>
-              <p className="text-gray-600 mb-4">Assigning to <strong>{mobile.brand} {mobile.model}</strong>. Edit number if needed.</p>
-              <input type="number" value={labelInput} onChange={e => setLabelInput(e.target.value)} className="w-full border border-gray-300 rounded-md px-4 py-2 text-2xl font-bold mb-4" />
-              <div className="flex space-x-3">
-                <button onClick={confirmAssign} disabled={assigningLabel} className="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700 font-medium disabled:opacity-50">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+            <div className="fixed inset-0" onClick={() => setShowLabelDialog(false)}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+              <h3 className="text-xl font-bold text-[#0f172a] mb-2">Assign Label Number</h3>
+              <p className="text-[#64748b] text-sm mb-4">Assigning to <strong className="text-[#0f172a]">{mobile?.brand} {mobile?.model}</strong>.</p>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" value={labelInput} onChange={e => setLabelInput(e.target.value)} className="w-full border-2 border-[#e2e8f0] focus:border-[#002395] outline-none rounded-xl px-4 py-3 text-2xl font-bold text-center mb-6 text-[#0f172a]" />
+              <div className="flex flex-col gap-3">
+                <button onClick={confirmAssign} disabled={assigningLabel} className="w-full bg-[#002395] text-white py-3 rounded-xl font-bold hover:bg-[#001a7a] transition disabled:opacity-50">
                   {assigningLabel ? 'Assigning...' : `Confirm #${labelInput}`}
                 </button>
-                <button onClick={() => setShowLabelDialog(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-md hover:bg-gray-300">Cancel</button>
+                <button onClick={() => setShowLabelDialog(false)} className="w-full bg-white border-2 border-[#e2e8f0] text-[#64748b] py-3 rounded-xl font-bold hover:bg-gray-50 transition">
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* EDIT MODAL */}
         {showEdit && (
-          <div className="fixed z-10 inset-0 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4">
-              <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowEdit(false)}></div>
-              <div className="relative bg-white rounded-lg shadow-xl sm:max-w-3xl w-full">
-                <div className="px-4 pt-5 pb-4 sm:p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-5">Edit Mobile Details</h3>
-                  <div className="max-h-[70vh] overflow-y-auto px-2">
-                    <SecondHandForm initialData={mobile} onSave={handleUpdate} onCancel={() => setShowEdit(false)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <SecondHandForm initialData={mobile} onSave={handleUpdate} onCancel={() => setShowEdit(false)} />
         )}
+
       </div>
     </Layout>
   );

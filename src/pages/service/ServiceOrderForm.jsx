@@ -1,7 +1,8 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
-import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, setDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import CustomerAutocomplete from '../../components/common/CustomerAutocomplete';
 import ImeiInput from '../../components/ImeiInput';
 import { getLabelNumber } from '../../utils/getLabelNumber';
@@ -9,9 +10,28 @@ import { printLabel } from '../../utils/printLabel.jsx';
 
 const PatternLock = lazy(() => import('../../components/PatternLock').catch(() => ({ default: () => <div className="text-red-500">Failed to load PatternLock</div> })));
 
+const generateSerialNumber = () => {
+  const date = new Date()
+  const dateStr = date.getFullYear().toString() +
+    String(date.getMonth() + 1).padStart(2, '0') +
+    String(date.getDate()).padStart(2, '0')
+  const random = Math.floor(1000 + Math.random() * 9000)
+  return `FM-${dateStr}-${random}`
+}
+
 const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
   const { currentUser, userName, userRole } = useAuth();
+  const { complaintTypes: complaintTypeOptions = [], accessories: accessoryOptions = [], brands: brandOptions = [], models: modelOptions = {} } = useSettings();
   const [staffOptions, setStaffOptions] = useState([]);
+  const [customModel, setCustomModel] = useState('');
+  const [isCustomModel, setIsCustomModel] = useState(false);
+
+  const LOCK_TYPES = ['None', 'PIN', 'Password', 'Pattern', 'Fingerprint', 'Face Unlock', 'Other'];
+  const ACCESSORIES_OPTIONS = accessoryOptions;
+  const BRANDS = brandOptions;
+  const MODELS = modelOptions;
+  const COMPLAINTS = complaintTypeOptions;
+  const STATUSES = ['Received', 'In Progress', 'Parts Awaiting', 'Completed', 'Awaiting Customer Approval', 'Returned'];
 
   const formatDateTimeLocal = (value) => {
     if (!value) return '';
@@ -30,6 +50,7 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
       receivedAt: formatDateTimeLocal(initialData.receivedAt) || nowLocal,
       expectedCompletionAt: formatDateTimeLocal(initialData.expectedCompletionAt) || ''
     } : {
+      customerId: '',
       customerName: '',
       customerPhone: '',
       alternatePhone: '',
@@ -62,9 +83,9 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
       otherComplaint: base.otherComplaint || (base.customComplaint || '')
     };
   });
-  
+
   const [complaintSearch, setComplaintSearch] = useState('');
-  
+
 
   const [customers, setCustomers] = useState([]);
   const [error, setError] = useState('');
@@ -104,6 +125,7 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
   const [assigning, setAssigning] = useState(false);
   const [localId, setLocalId] = useState(initialData?.id || null);
   const [saveStatus, setSaveStatus] = useState('idle'); // idle, saving, saved
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (localId) {
@@ -123,20 +145,7 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
     }
   }, [localId]);
 
-  const BRANDS = ['Samsung', 'Apple', 'Xiaomi', 'Realme', 'OPPO', 'Vivo', 'OnePlus', 'Nokia', 'Other'];
-  const COMPLAINTS = [
-    'Water locked mobile service', 'Display replacement', 'Battery replacement', 
-    'Battery & coil replacement', 'Touch glass crack replacement', 'Charging board replacement', 
-    'Charging pin fixing', 'Speaker replacement', 'Mike replacement service', 
-    'Motherboard EMMC work', 'Power IC work', 'General cleaning', 
-    'Power button strips replacement inner', 'Power button strips replacement outer', 
-    'Volume strip replacement inner', 'Volume strip replacement outer', 
-    'Ringer loud speaker replacement', 'Middle frame replacement', 'Full body panel Bezel', 
-    'Back door replacement', 'Network complaint fix', 'Tamper glass replacement', 
-    'Mobile pouch', 'Watch battery replacement', 'Watch charging issue or dead', 
-    'Bluetooth earphone battery replacement', 'Bluetooth earphone charging issues or dead', 
-    'Other'
-  ];
+
 
   const filteredComplaints = COMPLAINTS.filter(c => c.toLowerCase().includes(complaintSearch.toLowerCase()));
 
@@ -157,9 +166,8 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
       complaintTypes: (prev.complaintTypes || []).filter(t => t !== complaint)
     }));
   };
-  const LOCK_TYPES = ['None', 'PIN', 'Password', 'Pattern', 'Fingerprint', 'Face Unlock', 'Other'];
-  const ACCESSORIES_OPTIONS = ['SIM card', 'Memory card', 'Back cover', 'Charger', 'Earphones', 'Box', 'Other'];
-  const STATUSES = ['Received', 'In Progress', 'Parts Awaiting', 'Completed', 'Awaiting Customer Approval', 'Returned'];
+
+  const isCompletedOrder = initialData?.status === 'Completed';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -179,10 +187,11 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
   }, []);
 
   const handleCustomerSelect = (c) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      customerName: c.name || '', 
-      customerPhone: c.phone || '' 
+    setFormData(prev => ({
+      ...prev,
+      customerId: c.id || '',
+      customerName: c.name || '',
+      customerPhone: c.phone || ''
     }));
   };
 
@@ -201,7 +210,7 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
     if (!file) return;
     const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-    
+
     if (!cloudName || !uploadPreset || cloudName.includes('paste_')) {
       setError("Cloudinary configuration missing in .env");
       return;
@@ -243,6 +252,11 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
     }
     if (!formData.receivedAt || !formData.expectedCompletionAt) {
       setError('Please provide both received and expected completion dates');
+      return;
+    }
+
+    if (initialData?.status === 'Completed' && formData.status !== 'Completed') {
+      setError('Cannot change status for a completed service order.');
       return;
     }
 
@@ -294,6 +308,116 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
     } catch (err) {
       setError(err.message);
       setSaveStatus('idle');
+    }
+  };
+
+  const handleSaveAndPrint = async () => {
+    try {
+      if (!formData.imei1 || !formData.imei1.trim()) {
+        setError('Please provide IMEI 1');
+        return;
+      }
+      if (!formData.complaintTypes || formData.complaintTypes.length === 0) {
+        setError('Please select at least one complaint type');
+        return;
+      }
+      if (!formData.receivedAt || !formData.expectedCompletionAt) {
+        setError('Please provide both received and expected completion dates');
+        return;
+      }
+
+      setIsProcessing(true);
+      setError('');
+
+      // Step 1: Auto generate serial number
+      const finalSerialNumber = generateSerialNumber();
+
+      // Step 2: Save service order to Firestore
+      const finalData = { ...formData, createdBy: currentUser?.uid || '' };
+      if (finalData.brand === 'Other') {
+        finalData.brand = finalData.customBrand;
+      }
+      delete finalData.customBrand;
+      delete finalData.complaintNature;
+      delete finalData.customComplaint;
+      delete finalData.imei;
+      if (!finalData.complaintTypes.includes('Other')) {
+        finalData.otherComplaint = '';
+      }
+
+      if (userRole?.toLowerCase() === 'staff') {
+        finalData.technicianName = userName || currentUser?.displayName || currentUser?.email || '';
+        finalData.technicianUid = currentUser?.uid || '';
+      } else if (userRole?.toLowerCase() === 'admin') {
+        const selectedTech = staffOptions.find(u => u.uid === finalData.technicianUid);
+        finalData.technicianName = selectedTech?.name || finalData.technicianName || currentUser?.displayName || currentUser?.email || '';
+        finalData.technicianUid = finalData.technicianUid || currentUser?.uid || '';
+      } else {
+        finalData.technicianName = userName || currentUser?.displayName || currentUser?.email || '';
+        finalData.technicianUid = currentUser?.uid || '';
+      }
+
+      finalData.alternatePhone = formData.alternatePhone || '';
+      finalData.receivedAt = new Date(formData.receivedAt);
+      finalData.expectedCompletionAt = new Date(formData.expectedCompletionAt);
+      if (finalData.lockType !== 'Pattern') finalData.lockPattern = [];
+      if (!['PIN', 'Password', 'Other'].includes(finalData.lockType)) finalData.lockHint = '';
+      finalData.serialNumber = finalSerialNumber;
+
+      if (localId) finalData.id = localId;
+
+      const savedDocId = await onSave(finalData);
+      if (savedDocId) setLocalId(savedDocId);
+
+      // Step 3: Auto assign next label number
+      const nextLabel = await getLabelNumber();
+      const labelData = {
+        labelNumber: nextLabel,
+        labelType: "service_order",
+        referenceId: savedDocId || localId,
+        assignedBy: currentUser.uid,
+        assignedAt: new Date().toISOString(),
+        isActive: true,
+        data: {
+          orderNumber: finalData.orderNumber || initialData?.orderNumber || '',
+          brand: finalData.brand,
+          model: finalData.model,
+          customerName: finalData.customerName,
+          customerPhone: finalData.customerPhone,
+          complaintTypes: finalData.complaintTypes,
+          estimatedPrice: Number(finalData.estimatedPrice || 0),
+          technicianName: finalData.technicianName,
+          status: finalData.status,
+          serialNumber: finalSerialNumber,
+          createdBy: currentUser.uid,
+          createdAt: new Date().toISOString()
+        }
+      };
+
+      await setDoc(doc(db, "label_registry", nextLabel.toString()), labelData);
+
+      await updateDoc(doc(db, "service_orders", savedDocId || localId), {
+        assignedLabelNumber: nextLabel,
+        serialNumber: finalSerialNumber
+      });
+
+      // Step 4: Auto print label
+      await printLabel({
+        labelType: "service_order",
+        labelNumber: nextLabel,
+        data: labelData.data
+      });
+
+      setSaveStatus(`Saved & Label #${nextLabel} Assigned ✓`);
+      setLabelAssigned(true);
+      setAssignedLabelNumber(nextLabel);
+
+    } catch (error) {
+      console.error("Save & Print error:", error);
+      alert("Error during Save & Print. Please try again.");
+      setSaveStatus('idle');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -376,8 +500,8 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
 
   if (!currentUser) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="flex justify-center p-4 md:p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 break-words"></div>
         <span className="ml-3 text-gray-600">Loading user data...</span>
       </div>
     );
@@ -385,266 +509,402 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
 
   try {
     return (
-      <form onSubmit={handleSubmit} className="space-y-4 pb-8">
-        {error && <div className="text-red-600 bg-red-100 p-3 rounded">{error}</div>}
+  <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+    <div className="bg-white w-full md:max-w-2xl md:mx-auto rounded-t-3xl md:rounded-2xl flex flex-col max-h-[90vh]">
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Customer Details */}
-        <div className="md:col-span-2"><h4 className="font-semibold text-gray-700 border-b pb-2">Customer Details</h4></div>
-        <CustomerAutocomplete
-          customers={customers}
-          nameValue={formData.customerName}
-          phoneValue={formData.customerPhone}
-          alternatePhoneValue={formData.alternatePhone}
-          onNameChange={val => setFormData({...formData, customerName: val})}
-          onPhoneChange={val => setFormData({...formData, customerPhone: val})}
-          onAlternatePhoneChange={val => setFormData({...formData, alternatePhone: val})}
-          onSelectCustomer={handleCustomerSelect}
-        />
+      {/* Handle bar */}
+      <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
+        <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+      </div>
 
-        {/* Device Details */}
-        <div className="md:col-span-2 mt-4"><h4 className="font-semibold text-gray-700 border-b pb-2">Device Details</h4></div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Brand *</label>
-          <select required value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="">Select Brand</option>
-            {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-          {formData.brand === 'Other' && (
-            <input type="text" placeholder="Enter Custom Brand" required value={formData.customBrand || ''} onChange={e => setFormData({...formData, customBrand: e.target.value})} className="mt-2 block w-full border border-gray-300 rounded-md p-2" />
-          )}
+      {/* Fixed header */}
+      <div className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-gray-100 bg-white">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#0f172a]">
+            {initialData ? 'Edit Service Order' : 'New Service Order'}
+          </h2>
+          <button type="button" onClick={onCancel} className="text-gray-400 p-1">
+            <i className="fas fa-times text-lg"></i>
+          </button>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Model *</label>
-          <input type="text" required value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Colour</label>
-          <input type="text" value={formData.colour} onChange={e => setFormData({...formData, colour: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <ImeiInput
-              label="IMEI 1"
-              value={formData.imei1}
-              onChange={val => setFormData({...formData, imei1: val})}
-              required={true}
-              scannerId="scanner-service-imei1"
-            />
-          </div>
+      </div>
 
-          <div>
-            <ImeiInput
-              label="IMEI 2 (optional)"
-              value={formData.imei2}
-              onChange={val => setFormData({...formData, imei2: val})}
-              scannerId="scanner-service-imei2"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Phone Lock Type</label>
-          <select value={formData.lockType} onChange={e => {
-            const selected = e.target.value;
-            setFormData(prev => ({
-              ...prev,
-              lockType: selected,
-              lockPattern: selected === 'Pattern' ? prev.lockPattern || [] : [],
-              lockHint: selected === 'Pattern' ? '' : prev.lockHint
-            }));
-          }} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            {LOCK_TYPES.map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-        </div>
-        {['PIN', 'Password', 'Other'].includes(formData.lockType) && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Lock Hint</label>
-            <input type="text" value={formData.lockHint || ''} onChange={e => setFormData({...formData, lockHint: e.target.value})} placeholder="Optional hint for the lock" className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-          </div>
-        )}
-        {formData.lockType === 'Pattern' && (
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Draw Pattern</label>
-            <Suspense fallback={<div className="text-sm text-gray-500">Loading pattern lock...</div>}>
-              <PatternLock
-                value={formData?.lockPattern || []}
-                onChange={nextPattern => setFormData(prev => ({ ...prev, lockPattern: nextPattern || [] }))}
-              />
-            </Suspense>
+      {/* Scrollable form content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+            {error}
           </div>
         )}
 
-        {/* Issue Details */}
-        <div className="md:col-span-2 mt-4"><h4 className="font-semibold text-gray-700 border-b pb-2">Issue & Status</h4></div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Nature of Complaint *</label>
-          <input type="text" placeholder="Search complaints..." value={complaintSearch} onChange={e => setComplaintSearch(e.target.value)} className="mb-2 block w-full border border-gray-300 rounded-md p-2 text-sm" />
-          <div className="max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2 bg-white">
-            {filteredComplaints.map(c => (
-              <label key={c} className="flex items-center space-x-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                <input type="checkbox" checked={(formData.complaintTypes || []).includes(c)} onChange={() => handleComplaintToggle(c)} className="h-4 w-4 text-indigo-600 rounded border-gray-300" />
-                <span className="text-sm text-gray-700">{c}</span>
-              </label>
-            ))}
-            {filteredComplaints.length === 0 && <div className="text-sm text-gray-500 p-2">No complaints found</div>}
+        {/* CUSTOMER DETAILS SECTION */}
+        <div>
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+            Customer Details
+          </p>
+          <div className="space-y-3">
+            <CustomerAutocomplete
+              customers={customers}
+              nameValue={formData.customerName}
+              phoneValue={formData.customerPhone}
+              alternatePhoneValue={formData.alternatePhone}
+              onNameChange={val => setFormData({ ...formData, customerName: val, customerId: '' })}
+              onPhoneChange={val => setFormData({ ...formData, customerPhone: val, customerId: '' })}
+              onAlternatePhoneChange={val => setFormData({ ...formData, alternatePhone: val })}
+              onSelectCustomer={handleCustomerSelect}
+            />
           </div>
-          {(formData.complaintTypes || []).length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {(formData.complaintTypes || []).map(c => (
-                <span key={c} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {c}
-                  <button type="button" onClick={() => removeComplaint(c)} className="ml-1.5 inline-flex text-blue-400 hover:text-blue-600 focus:outline-none">
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+        </div>
+
+        {/* DEVICE INFO SECTION */}
+        <div>
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+            Device Info
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Brand *</label>
+              <select required value={formData.brand} onChange={e => {
+                const selectedBrand = e.target.value
+                setFormData(prev => ({ ...prev, brand: selectedBrand, model: '' }))
+                setCustomModel('')
+                setIsCustomModel(false)
+              }} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]">
+                <option value="">Select Brand</option>
+                {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              {formData.brand === 'Other' && (
+                <input type="text" placeholder="Enter Custom Brand" required value={formData.customBrand || ''} onChange={e => setFormData({ ...formData, customBrand: e.target.value })} className="mt-2 w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Model *</label>
+              <select
+                required
+                value={isCustomModel ? '__custom__' : formData.model}
+                onChange={e => {
+                  if (e.target.value === '__custom__') {
+                    setIsCustomModel(true)
+                    setFormData(prev => ({ ...prev, model: '' }))
+                  } else {
+                    setIsCustomModel(false)
+                    setCustomModel('')
+                    setFormData(prev => ({ ...prev, model: e.target.value }))
+                  }
+                }}
+                disabled={!formData.brand}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              >
+                <option value="" disabled>{formData.brand ? 'Select model' : 'Select brand first'}</option>
+                {formData.brand && (MODELS[formData.brand] || []).length === 0 && (
+                  <option value="" disabled>No models available</option>
+                )}
+                {(MODELS[formData.brand] || []).map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+                <option value="__custom__">Other (type manually)</option>
+              </select>
+              {isCustomModel && (
+                <input
+                  type="text"
+                  placeholder="Type model name"
+                  value={customModel}
+                  onChange={e => {
+                    setCustomModel(e.target.value)
+                    setFormData(prev => ({ ...prev, model: e.target.value }))
+                  }}
+                  className="mt-2 w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Colour</label>
+              <input type="text" value={formData.colour} onChange={e => setFormData({ ...formData, colour: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <ImeiInput
+                  label="IMEI 1"
+                  value={formData.imei1}
+                  onChange={val => setFormData({ ...formData, imei1: val })}
+                  required={true}
+                  scannerId="scanner-service-imei1"
+                />
+              </div>
+              <div>
+                <ImeiInput
+                  label="IMEI 2 (optional)"
+                  value={formData.imei2}
+                  onChange={val => setFormData({ ...formData, imei2: val })}
+                  scannerId="scanner-service-imei2"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* COMPLAINT SECTION */}
+        <div>
+          <p className="text-xs font-bold text-[#ED2939] uppercase tracking-wide mb-3 border-l-4 border-[#ED2939] pl-3">
+            Issues & Complaints
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Complaint type *</label>
+              <input type="text" placeholder="Search complaints..." value={complaintSearch} onChange={e => setComplaintSearch(e.target.value)} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] mb-2" />
+              <div className="max-h-[200px] overflow-y-auto border border-gray-300 rounded-xl p-2 bg-white">
+                {filteredComplaints.map(c => (
+                  <label key={c} className="flex items-center space-x-2 p-1.5 hover:bg-blue-50 rounded cursor-pointer">
+                    <input type="checkbox" checked={(formData.complaintTypes || []).includes(c)} onChange={() => handleComplaintToggle(c)} className="h-4 w-4 text-[#002395] rounded border-gray-300 focus:ring-[#002395]" />
+                    <span className="text-sm text-gray-700">{c}</span>
+                  </label>
+                ))}
+                {filteredComplaints.length === 0 && <div className="text-sm text-[#64748b] p-2">No complaints found</div>}
+              </div>
+              {(formData.complaintTypes || []).length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {(formData.complaintTypes || []).map(c => (
+                    <span key={c} className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[#002395] text-white">
+                      {c}
+                      <button type="button" onClick={() => removeComplaint(c)} className="ml-1.5 inline-flex text-white hover:text-red-200 focus:outline-none">
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(formData.complaintTypes || []).includes('Other') && (
+                <div className="mt-3">
+                  <input type="text" required placeholder="Describe the other complaint" value={formData.otherComplaint || ''} onChange={e => setFormData({ ...formData, otherComplaint: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+              <select
+                required
+                value={formData.status}
+                onChange={e => !isCompletedOrder && setFormData({ ...formData, status: e.target.value })}
+                disabled={isCompletedOrder}
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none ${isCompletedOrder ? 'border-gray-200 bg-gray-100 text-gray-600' : 'border-gray-300 focus:border-[#002395]'}`}
+              >
+                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {isCompletedOrder && (
+                <p className="text-xs text-gray-500 mt-2">Status is locked after completion and cannot be changed.</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Problem details</label>
+              <textarea value={formData.problemDetails} onChange={e => setFormData({ ...formData, problemDetails: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" rows="2"></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Accessories collected</label>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {ACCESSORIES_OPTIONS.map(acc => (
+                  <label key={acc} className="inline-flex items-center">
+                    <input type="checkbox" checked={formData.accessories.includes(acc)} onChange={() => handleAccessoryChange(acc)} className="h-4 w-4 text-[#002395] rounded border-gray-300 focus:ring-[#002395]" />
+                    <span className="ml-2 text-sm text-gray-700">{acc}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SERVICE DETAILS SECTION */}
+        <div>
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+            Service Details
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estimated price *</label>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" required min="0" value={formData.estimatedPrice} onChange={e => setFormData({ ...formData, estimatedPrice: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Advance paid</label>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" min="0" value={formData.advancePaid} onChange={e => setFormData({ ...formData, advancePaid: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Raw material cost</label>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" min="0" value={formData.rawMaterialCost} onChange={e => setFormData({ ...formData, rawMaterialCost: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Outside labour cost</label>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" min="0" value={formData.outsideLabourCost} onChange={e => setFormData({ ...formData, outsideLabourCost: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Received at *</label>
+              <input type="datetime-local" required value={formData.receivedAt} onChange={e => setFormData({ ...formData, receivedAt: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Expected completion *</label>
+              <input type="datetime-local" required value={formData.expectedCompletionAt} onChange={e => setFormData({ ...formData, expectedCompletionAt: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Technician</label>
+              {userRole?.toLowerCase() === 'admin' ? (
+                <select
+                  value={formData.technicianUid}
+                  onChange={e => {
+                    const selected = staffOptions.find(s => s.uid === e.target.value);
+                    setFormData(prev => ({
+                      ...prev,
+                      technicianUid: e.target.value,
+                      technicianName: selected?.name || selected?.email || prev.technicianName
+                    }));
+                  }}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+                >
+                  <option value="">Select Technician</option>
+                  {staffOptions.map(staff => (
+                    <option key={staff.uid} value={staff.uid}>{`${staff.name || staff.email}${staff.role ? ` (${staff.role})` : ''}`}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-gray-50 font-medium text-gray-600">
+                  {formData.technicianName || userName || currentUser?.displayName || currentUser?.email || 'Current User'}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Suggestions</label>
+              <textarea value={formData.suggestions} onChange={e => setFormData({ ...formData, suggestions: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" rows="2"></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Device image</label>
+              {formData.imageUrl ? (
+                <div className="relative inline-block">
+                  <img src={formData.imageUrl} alt="Device" className="mt-2 h-32 w-32 object-cover rounded-xl shadow-sm border border-gray-200" />
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                    className="absolute top-1 right-1 bg-[#ED2939] text-white w-6 h-6 rounded-full flex items-center justify-center"
+                  >
+                    <i className="fas fa-times text-xs"></i>
                   </button>
-                </span>
-              ))}
+                </div>
+              ) : (
+                <div className="flex gap-2 mt-1">
+                  <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#002395]/30 bg-[#002395]/5 rounded-xl h-16 cursor-pointer active:scale-95 transition">
+                    <i className="fas fa-camera text-[#002395] text-lg mb-0.5"></i>
+                    <span className="text-xs text-[#002395] font-medium">Camera</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={e => handleUpload(e.target.files[0])}
+                      className="hidden"
+                    />
+                  </label>
+                  <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl h-16 cursor-pointer active:scale-95 transition">
+                    <i className="fas fa-images text-gray-500 text-lg mb-0.5"></i>
+                    <span className="text-xs text-gray-500 font-medium">Gallery</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handleUpload(e.target.files[0])}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
+              {uploading && <span className="text-sm text-[#002395] mt-1 inline-block">Uploading...</span>}
             </div>
-          )}
-          {(formData.complaintTypes || []).includes('Other') && (
-            <div className="mt-3">
-              <input type="text" required placeholder="Describe the other complaint" value={formData.otherComplaint || ''} onChange={e => setFormData({...formData, otherComplaint: e.target.value})} className="block w-full border border-gray-300 rounded-md p-2 text-sm" />
-            </div>
-          )}
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Status *</label>
-          <select required value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Exact Problem / Details</label>
-          <textarea value={formData.problemDetails} onChange={e => setFormData({...formData, problemDetails: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows="2"></textarea>
-        </div>
-
-        {/* Accessories */}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Accessories Collected</label>
-          <div className="flex flex-wrap gap-3">
-            {ACCESSORIES_OPTIONS.map(acc => (
-              <label key={acc} className="inline-flex items-center">
-                <input type="checkbox" checked={formData.accessories.includes(acc)} onChange={() => handleAccessoryChange(acc)} className="h-4 w-4 text-indigo-600 rounded border-gray-300" />
-                <span className="ml-2 text-sm text-gray-700">{acc}</span>
-              </label>
-            ))}
           </div>
         </div>
 
-        {/* Financial & Assignment */}
-        <div className="md:col-span-2 mt-4"><h4 className="font-semibold text-gray-700 border-b pb-2">Financial & Assignment</h4></div>
+        {/* LOCK & SECURITY SECTION */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Estimated Price (₹) *</label>
-          <input type="number" required min="0" value={formData.estimatedPrice} onChange={e => setFormData({...formData, estimatedPrice: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Advance Paid (₹)</label>
-          <input type="number" min="0" value={formData.advancePaid} onChange={e => setFormData({...formData, advancePaid: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Raw Material Cost (₹)</label>
-          <input type="number" min="0" value={formData.rawMaterialCost} onChange={e => setFormData({...formData, rawMaterialCost: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Outside Labour Cost (₹)</label>
-          <input type="number" min="0" value={formData.outsideLabourCost} onChange={e => setFormData({...formData, outsideLabourCost: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Received At *</label>
-          <input type="datetime-local" required value={formData.receivedAt} onChange={e => setFormData({...formData, receivedAt: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Expected Completion *</label>
-          <input type="datetime-local" required value={formData.expectedCompletionAt} onChange={e => setFormData({...formData, expectedCompletionAt: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Technician</label>
-          {userRole?.toLowerCase() === 'admin' ? (
-            <select
-              value={formData.technicianUid}
-              onChange={e => {
-                const selected = staffOptions.find(s => s.uid === e.target.value);
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+            Lock & Security
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Lock type</label>
+              <select value={formData.lockType} onChange={e => {
+                const selected = e.target.value;
                 setFormData(prev => ({
                   ...prev,
-                  technicianUid: e.target.value,
-                  technicianName: selected?.name || selected?.email || prev.technicianName
+                  lockType: selected,
+                  lockPattern: selected === 'Pattern' ? prev.lockPattern || [] : [],
+                  lockHint: selected === 'Pattern' ? '' : prev.lockHint
                 }));
-              }}
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white"
-            >
-              <option value="">Select Technician</option>
-              {staffOptions.map(staff => (
-                <option key={staff.uid} value={staff.uid}>{`${staff.name || staff.email}${staff.role ? ` (${staff.role})` : ''}`}</option>
-              ))}
-            </select>
-          ) : (
-            <div className="mt-1 block w-full border border-gray-200 rounded-md p-2 bg-gray-50 text-gray-700 font-medium">
-              {formData.technicianName || userName || currentUser?.displayName || currentUser?.email || 'Current User'}
+              }} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]">
+                {LOCK_TYPES.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
             </div>
-          )}
+            {['PIN', 'Password', 'Other'].includes(formData.lockType) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Lock hint</label>
+                <input type="text" value={formData.lockHint || ''} onChange={e => setFormData({ ...formData, lockHint: e.target.value })} placeholder="Optional hint for the lock" className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]" />
+              </div>
+            )}
+            {formData.lockType === 'Pattern' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Draw pattern</label>
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-300 flex justify-center">
+                  <Suspense fallback={<div className="text-sm text-gray-500">Loading pattern lock...</div>}>
+                    <PatternLock
+                      value={formData?.lockPattern || []}
+                      onChange={nextPattern => setFormData(prev => ({ ...prev, lockPattern: nextPattern || [] }))}
+                    />
+                  </Suspense>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        
-        {/* Images & Notes */}
-        <div className="md:col-span-2 mt-4"><h4 className="font-semibold text-gray-700 border-b pb-2">Additional</h4></div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Suggestions / Precaution Notes</label>
-          <textarea value={formData.suggestions} onChange={e => setFormData({...formData, suggestions: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows="2"></textarea>
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Device Image (Optional)</label>
-          <input type="file" accept="image/*" onChange={e => handleUpload(e.target.files[0])} className="mt-1 block w-full text-sm" />
-          {uploading && <span className="text-sm text-blue-600">Uploading...</span>}
-          {formData.imageUrl && <img src={formData.imageUrl} alt="Device" className="mt-2 h-32 w-32 object-cover rounded shadow" />}
-        </div>
+
       </div>
 
-      <div className="flex flex-col mt-6 pt-4 border-t">
-        {saveStatus === 'saved' && <div className="text-green-600 font-medium mb-3">Saved successfully</div>}
-        <div className="flex gap-3 flex-wrap items-center">
-          {saveStatus === 'saved' ? (
-            <button type="submit" disabled={uploading} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700">
-              Saved ✓
-            </button>
-          ) : (
-            <button type="submit" disabled={saveStatus === 'saving' || uploading} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 hover:bg-blue-700">
-              {saveStatus === 'saving' ? 'Saving...' : 'Save Order'}
-            </button>
-          )}
-          
-          {labelAssigned ? (
-            <button type="button" disabled className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold cursor-not-allowed">
-              Label #{assignedLabelNumber} ✓
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleAssignLabel}
-              disabled={!localId || assigning}
-              className="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
-            >
-              {assigning ? 'Assigning...' : 'Assign Label'}
-            </button>
-          )}
-          
+      {/* Fixed footer with buttons */}
+      <div className="flex-shrink-0 px-4 py-3 border-t border-gray-100 bg-white">
+        <div className="flex gap-3">
           <button
             type="button"
-            onClick={handlePrintLabel}
-            disabled={!localId}
-            className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700"
+            onClick={onCancel}
+            className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-semibold"
           >
-            Print Label
+            Cancel
           </button>
-
-          <button type="button" onClick={onCancel} className="px-4 py-2 border rounded-lg text-gray-700 bg-white hover:bg-gray-50 ml-auto font-medium">
-            {saveStatus === 'saved' || labelAssigned ? 'Done' : 'Cancel'}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saveStatus === 'saving' || uploading || saveStatus.includes('saved') || saveStatus.includes('Saved')}
+            className="flex-1 bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus.includes('saved') || saveStatus.includes('Saved') ? 'Saved ✓' : initialData ? 'Save Changes' : 'Create Order'}
           </button>
         </div>
+        
+        {!initialData && (
+          <button
+            type="button"
+            onClick={handleSaveAndPrint}
+            disabled={isProcessing || saveStatus.includes('Assigned ✓')}
+            className="w-full mt-3 bg-green-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            {isProcessing ? (
+              <span><i className="fas fa-spinner fa-spin mr-2"></i>Processing...</span>
+            ) : saveStatus.includes('Assigned ✓') ? (
+              <span>Done ✓</span>
+            ) : (
+              <span><i className="fas fa-print mr-2"></i>Save & Print</span>
+            )}
+          </button>
+        )}
       </div>
-      </form>
-    );
+
+    </div>
+  </div>
+);
   } catch (err) {
     console.error("Error rendering ServiceOrderForm:", err);
     return (
-      <div className="p-8 text-center text-red-600 bg-red-50 rounded-lg">
+      <div className="p-4 md:p-8 text-center text-red-600 bg-red-50 rounded-lg break-words">
         <h3 className="font-bold mb-2">Something went wrong.</h3>
         <p>Please refresh the page or contact support if the issue persists.</p>
         <p className="text-xs mt-2 text-red-400">{err.message}</p>

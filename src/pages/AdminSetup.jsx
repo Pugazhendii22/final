@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, setDoc, doc, limit } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase/firebase';
@@ -18,7 +18,7 @@ const AdminSetup = () => {
       try {
         const q = query(collection(db, 'users'), where('role', '==', 'admin'), limit(1));
         const querySnapshot = await getDocs(q);
-        
+
         if (!querySnapshot.empty) {
           // Admin already exists
           navigate('/login', { replace: true });
@@ -67,22 +67,22 @@ const AdminSetup = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="w-12 h-12 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
+      <div className="flex items-center justify-center min-h-screen bg-[#f8fafc]">
+        <div className="w-12 h-12 border-4 border-[#002395] rounded-full border-t-transparent animate-spin break-words"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-xl shadow-lg border border-gray-100">
+    <div className="flex items-center justify-center min-h-screen bg-[#f8fafc]">
+      <div className="w-full max-w-md p-6 md:p-10 space-y-8 bg-white rounded-2xl shadow-xl border border-[#e2e8f0] break-words">
         <div className="text-center">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">System Setup</h2>
-          <p className="mt-2 text-sm text-gray-600">Create the initial Admin account</p>
+          <h2 className="text-4xl font-extrabold text-[#002395] tracking-tight">System Setup</h2>
+          <p className="mt-2 text-sm text-[#64748b] font-medium">Create the initial Admin account</p>
         </div>
-        
+
         {error && (
-          <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg" role="alert">
+          <div className="p-4 text-sm font-bold text-[#ED2939] bg-red-50 border border-red-200 rounded-xl break-words" role="alert">
             {error}
           </div>
         )}
@@ -95,7 +95,7 @@ const AdminSetup = () => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 focus:bg-white"
+                  className="w-full px-4 py-3 border-2 border-[#e2e8f0] rounded-xl focus:border-[#002395] transition-colors bg-white focus:outline-none font-medium text-[#0f172a] break-words"
                   placeholder="Admin Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -108,7 +108,7 @@ const AdminSetup = () => {
                 <input
                   type="email"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 focus:bg-white"
+                  className="w-full px-4 py-3 border-2 border-[#e2e8f0] rounded-xl focus:border-[#002395] transition-colors bg-white focus:outline-none font-medium text-[#0f172a] break-words"
                   placeholder="admin@frenchmobiles.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -122,7 +122,7 @@ const AdminSetup = () => {
                   type="password"
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 focus:bg-white"
+                  className="w-full px-4 py-3 border-2 border-[#e2e8f0] rounded-xl focus:border-[#002395] transition-colors bg-white focus:outline-none font-medium text-[#0f172a] break-words"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -135,7 +135,7 @@ const AdminSetup = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-sm text-sm font-bold text-white bg-[#002395] hover:bg-[#001a7a] focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed transition-colors break-words"
             >
               {submitting ? 'Creating...' : 'Create Admin Account'}
             </button>

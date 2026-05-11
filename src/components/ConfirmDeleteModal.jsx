@@ -1,5 +1,3 @@
-import React from 'react';
-
 const ConfirmDeleteModal = ({
   isOpen,
   onConfirm,
@@ -11,7 +9,7 @@ const ConfirmDeleteModal = ({
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+      <div className="bg-white rounded-xl p-4 md:p-6 max-w-sm w-full mx-4 shadow-xl break-words">
         <div className="flex flex-col items-center text-center">
           <svg className="w-12 h-12 text-red-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
@@ -24,14 +22,14 @@ const ConfirmDeleteModal = ({
           <button
             onClick={onCancel}
             disabled={deleting}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 break-words"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={deleting}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 break-words"
           >
             {deleting ? 'Deleting...' : 'Delete'}
           </button>

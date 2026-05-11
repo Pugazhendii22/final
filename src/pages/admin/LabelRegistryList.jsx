@@ -50,84 +50,116 @@ const LabelRegistryList = () => {
   };
 
   const filteredLabels = labels.filter(l => !searchQuery || String(l.labelNumber).includes(searchQuery));
-
   return (
-    <Layout title="Label Registry">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Label Registry</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{labels.length} labels</p>
+    <Layout title="Label Registry" pageType="list">
+      <div className="flex-1 min-w-0">
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0f172a]">Label Registry</h1>
+            <p className="text-sm text-[#64748b] mt-1">Track label assignments with a clean registry view.</p>
+          </div>
+          <div className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a]">
+            {labels.length} labels available
+          </div>
         </div>
-      </div>
 
-      <input type="text" placeholder="Search by Label Number..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full mb-4 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm" />
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 mb-6 break-words">
+          <div className="flex flex-col md:flex-row items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search by Label Number..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="flex-1 border-2 border-[#e2e8f0] focus:border-[#002395] rounded-2xl px-4 py-3 text-sm text-[#0f172a] outline-none transition-colors"
+            />
+          </div>
+        </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse" />)}</div>
-      ) : (
-        <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Label #</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Type</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Reference</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Date</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase text-xs">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
+        {loading ? (
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse break-words" />)}</div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] overflow-hidden break-words">
+            <div className="divide-y divide-gray-100">
               {filteredLabels.map(l => (
-                <tr key={l.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-bold text-indigo-600 whitespace-nowrap">#{l.labelNumber}</td>
-                  <td className="px-4 py-3 text-gray-500 uppercase whitespace-nowrap text-xs">{(l.labelType || '').replace('_', ' ')}</td>
-                  <td className="px-4 py-3 text-gray-900">
+                <div key={l.id} className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 hover:bg-gray-50 transition-colors break-words">
+                  <div>
+                    <p className="text-sm font-semibold text-[#002395]">#{l.labelNumber}</p>
+                    <p className="text-xs text-[#64748b] mt-1">{(l.labelType || '').replace('_', ' ')}</p>
+                  </div>
+                  <div className="text-sm text-[#0f172a] font-medium">
                     {l.labelType === 'second_hand' && `${l.data?.brand || ''} ${l.data?.model || ''}`}
                     {l.labelType === 'service_order' && `${l.data?.orderNumber || ''} - ${l.data?.customerName || ''}`}
                     {l.labelType === 'product' && `${l.data?.productName || ''}`}
                     {l.labelType === 'sale' && `${l.data?.invoiceNumber || ''}`}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{l.assignedAt ? new Date(l.assignedAt).toLocaleDateString() : '-'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-right space-x-1">
-                    <button onClick={() => printLabel(l)} className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">Print</button>
-                    <button onClick={() => handleEditClick(l)} className="text-indigo-600 hover:text-indigo-900 text-xs font-medium">Edit</button>
+                  </div>
+                  <div className="text-xs text-[#64748b] whitespace-nowrap">{l.assignedAt ? new Date(l.assignedAt).toLocaleDateString() : '-'}</div>
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <button onClick={() => printLabel(l)} className="bg-[#002395] text-white px-3 py-2 rounded-2xl text-xs font-semibold hover:bg-[#001a7a] transition-colors">Print</button>
+                    <button onClick={() => handleEditClick(l)} className="border border-[#e2e8f0] text-[#002395] px-3 py-2 rounded-2xl text-xs font-semibold hover:bg-blue-50 transition-colors">Edit</button>
                     {userRole === 'admin' && (
                       <button
                         onClick={() => setDeleteTarget(l)}
                         title="Delete label"
-                        className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                        className="text-[#ED2939] hover:bg-red-50 px-3 py-2 rounded-2xl text-xs font-semibold transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Delete
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {editingLabel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm mx-4">
-            <h3 className="text-lg font-bold mb-4">Edit Label Number</h3>
-            <input type="number" value={newLabelNum} onChange={e => setNewLabelNum(e.target.value)} className="w-full border rounded-lg p-2.5 mb-4 text-xl" />
-            <div className="flex gap-2">
-              <button onClick={handleUpdateNumber} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium">Save</button>
-              <button onClick={() => setEditingLabel(null)} className="flex-1 bg-gray-200 py-2.5 rounded-lg font-medium">Cancel</button>
             </div>
           </div>
-        </div>
-      )}
-      <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Label"
-        message="Are you sure you want to delete this label entry? This action cannot be undone."
-      />
+        )}
+
+        {editingLabel && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-4">
+            <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between px-5 py-4 bg-[#002395] text-white">
+                <h2 className="text-lg font-bold">Edit Label Number</h2>
+                <button onClick={() => setEditingLabel(null)} className="p-2 rounded-full hover:bg-white/20 transition">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#0f172a] mb-1">Label Number</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={newLabelNum}
+                    onChange={e => setNewLabelNum(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e2e8f0] px-4 py-3 text-sm text-[#0f172a] focus:border-[#002395] focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-4 border-t border-[#e2e8f0] bg-[#f8fafc]">
+                <button
+                  onClick={() => setEditingLabel(null)}
+                  className="flex-1 rounded-2xl border border-[#d1d5db] py-3 text-sm font-semibold text-[#64748b] hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateNumber}
+                  className="flex-1 rounded-2xl bg-[#002395] py-3 text-sm font-semibold text-white hover:bg-[#001a7a]"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <ConfirmDeleteModal
+          isOpen={!!deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          deleting={deleting}
+          title="Delete Label"
+          message="Are you sure you want to delete this label entry? This action cannot be undone."
+        />
+      </div>
     </Layout>
   );
 };

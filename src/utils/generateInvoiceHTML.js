@@ -54,8 +54,9 @@ export const generateInvoiceHTML = (sale) => {
   #invoice-print-overlay .page { max-width: 210mm; margin: 0 auto; background: #fff; }
   #invoice-print-overlay .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
   #invoice-print-overlay .invoice-label { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px; }
-  #invoice-print-overlay .shop-name { font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  #invoice-print-overlay .shop-address { font-size: 11px; line-height: 1.6; }
+  #invoice-print-overlay .shop-name { font-size: 24px; font-weight: 900; font-family: Arial Black, Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  #invoice-print-overlay .shop-address { font-size: 11px; line-height: 1.6; color: #333; }
+  #invoice-print-overlay .shop-phone { font-size: 16px; font-weight: 900; font-family: Arial Black, Arial, sans-serif; letter-spacing: 1px; margin-top: 4px; }
   #invoice-print-overlay .details-row { display: flex; justify-content: space-between; border: 1px solid #000; padding: 8px 10px; margin-bottom: 10px; }
   #invoice-print-overlay .details-left { width: 55%; }
   #invoice-print-overlay .details-right { width: 42%; }
@@ -91,9 +92,12 @@ export const generateInvoiceHTML = (sale) => {
 </style>
 <div id="invoice-content" class="page">
   <div class="header">
-    <div class="invoice-label">Invoice</div>
-    <div class="shop-name">French Mobiles</div>
-    <div class="shop-address">Puducherry<br>Mobile : 9994872888</div>
+    <div class="invoice-label">INVOICE</div>
+    <div class="shop-name">THE FRENCH MOBILES</div>
+    <div class="shop-address">
+      225, Thiruvalluvar Salai, Puducherry
+    </div>
+    <div class="shop-phone">+91 99447 01436</div>
   </div>
 
   <div class="details-row">

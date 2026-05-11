@@ -1,74 +1,102 @@
-import React from 'react';
+import { jsPDF } from 'jspdf';
 import { createRoot } from 'react-dom/client';
 import LabelPrint from '../components/labels/LabelPrint';
 
-const waitForBarcode = (container) => {
-  return new Promise((resolve) => {
-    let attempts = 0;
-    const maxAttempts = 20; // wait max 3 seconds (20 × 150ms)
-
-    const check = () => {
-      attempts++;
-      const svg = container.querySelector('svg');
-      const hasContent = svg && svg.children.length > 0;
-
-      if (hasContent) {
-        // Extra 400ms buffer after barcode renders
-        setTimeout(resolve, 400);
-      } else if (attempts >= maxAttempts) {
-        // Timeout fallback - print anyway after 3 seconds
-        resolve();
-      } else {
-        setTimeout(check, 150);
-      }
-    };
-
-    setTimeout(check, 150);
-  });
-};
+let isPrinting = false;
 
 export const printLabel = async (labelData) => {
-  // Prevent duplicate calls
-  if (document.getElementById("print-label-root")) {
-    document.getElementById("print-label-root").remove();
-  }
+  if (isPrinting) return;
+  isPrinting = true;
 
-  // Create a hidden container for the label
-  const printDiv = document.createElement('div');
-  printDiv.id = 'print-label-root';
-  printDiv.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100mm;
-    height: 50mm;
-    z-index: 99999;
-    background: white;
-  `;
-  document.body.appendChild(printDiv);
+  try {
+    // Create PDF at exact 50mm x 25mm
+    const pdf = new jsPDF({
+      unit: 'mm',
+      format: [50, 25],
+      orientation: 'landscape'
+    });
 
-  const root = createRoot(printDiv);
-  
-  // Render the label component into the container
-  root.render(<LabelPrint labelData={labelData} />);
+    // Verify PDF page size
+    console.log('PDF page size (mm):', pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
 
-  // Wait for barcode SVG to render properly
-  await waitForBarcode(printDiv);
+    // Render label to hidden div first to get content
+    const printDiv = document.createElement('div');
+    printDiv.id = 'print-label-temp';
+    printDiv.style.cssText = `
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: 189px;
+      height: 95px;
+      background: white;
+      overflow: hidden;
+    `;
+    document.body.appendChild(printDiv);
 
-  // Inject label page size style
-  const styleTag = document.createElement('style');
-  styleTag.id = 'print-label-page-style';
-  styleTag.textContent = '@media print { @page { size: 100mm 50mm; margin: 0; } }';
-  document.head.appendChild(styleTag);
+    const root = createRoot(printDiv);
+    root.render(<LabelPrint labelData={labelData} />);
 
-  // Now print
-  window.print();
-  
-  // Cleanup after print dialog is closed or shown
-  window.onafterprint = () => {
+    // Wait for barcode to render
+    await new Promise(resolve => {
+      let attempts = 0;
+      const check = () => {
+        attempts++;
+        const svg = printDiv.querySelector('svg');
+        const hasContent = svg && svg.children.length > 3;
+        if (hasContent) {
+          setTimeout(resolve, 400);
+        } else if (attempts >= 20) {
+          resolve();
+        } else {
+          setTimeout(check, 150);
+        }
+      };
+      setTimeout(check, 200);
+    });
+
+    // Use html2canvas to capture the rendered label
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await html2canvas(printDiv, {
+      scale: 10,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 189,
+      height: 95,
+      windowWidth: 189,
+      windowHeight: 95,
+      scrollX: 0,
+      scrollY: 0
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+
+    // Add image to PDF at exact size
+    pdf.addImage(imgData, 'PNG', 0, 0, 50, 25);
+
+    // Open PDF in new tab for printing
+    // This auto-sets paper size to 50x25mm
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(pdfUrl, '_blank');
+
+    if (printWindow) {
+      printWindow.addEventListener('load', () => {
+        printWindow.document.title = 'French Mobiles Label';
+        setTimeout(() => {
+          printWindow.print();
+        }, 800);
+      });
+    }
+
+    // Cleanup
     root.unmount();
     printDiv.remove();
-    styleTag.remove();
-    window.onafterprint = null;
-  };
+    URL.revokeObjectURL(pdfUrl);
+
+  } catch (error) {
+    console.error('Print error:', error);
+    alert('Print failed. Please try again.');
+  } finally {
+    isPrinting = false;
+  }
 };

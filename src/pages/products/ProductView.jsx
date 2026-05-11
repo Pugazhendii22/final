@@ -76,158 +76,205 @@ const ProductView = () => {
     finally { setAssigningLabel(false); }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
-  if (!product) return <div className="p-8 text-center text-red-600">Product not found</div>;
+  if (loading) return <div className="p-4 md:p-8 text-center">Loading...</div>;
+  if (!product) return <div className="p-4 md:p-8 text-center text-red-600">Product not found</div>;
 
   return (
-    <Layout title="Product Detail">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-4">
-            <button onClick={() => navigate('/products')} className="flex items-center text-gray-500 hover:text-indigo-600 font-medium">
-              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>Back
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-            <span className={`px-3 py-1 text-sm font-semibold rounded-full
-              ${product.status === 'in stock' ? 'bg-green-100 text-green-800' : ''}
-              ${product.status === 'low stock' ? 'bg-yellow-100 text-yellow-800' : ''}
-              ${product.status === 'out of stock' ? 'bg-red-100 text-red-800' : ''}`}>
-              {product.status?.toUpperCase()}
-            </span>
-          </div>
-          <div className="flex items-center space-x-3">
-            {labelEntry ? (
-              <>
-                <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-800 border border-green-300">
-                  🏷 Label: #{labelEntry.labelNumber}
-                </span>
-                <button onClick={() => printLabel(labelEntry)} className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center">
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                  Print
-                </button>
-              </>
-            ) : (
-              <button onClick={openLabelDialog} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-medium">
-                Assign Label Number
-              </button>
-            )}
-            <button onClick={() => setShowEdit(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Edit</button>
-          </div>
+    <Layout title="Product Detail" pageType="detail" backTo="/products">
+      <div className="min-h-screen bg-[#f8fafc] pb-24">
+
+        {/* HEADER */}
+        <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-30 shadow-sm">
+          <button onClick={() => navigate('/products')} className="text-[#002395] p-1">
+            <i className="fas fa-arrow-left text-lg"></i>
+          </button>
+          <h1 className="text-lg font-bold text-[#0f172a] flex-1">Product Details</h1>
         </div>
 
-        <div className="bg-white shadow sm:rounded-lg mb-8">
-          <div className="px-4 py-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <dl className="space-y-4">
-              <div><dt className="text-sm font-medium text-gray-500">Brand</dt><dd className="mt-1 text-sm text-gray-900">{product.brand || '-'}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Category</dt><dd className="mt-1 text-sm text-gray-900">{product.category}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">SKU / Barcode</dt><dd className="mt-1 text-sm text-gray-900 font-mono">{product.sku}</dd></div>
-              <div><dt className="text-sm font-medium text-gray-500">Notes</dt><dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{product.notes || '-'}</dd></div>
-            </dl>
-            <dl className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <dt className="text-sm font-medium text-gray-500">Stock</dt>
-                <dd className="mt-2 text-3xl font-bold text-gray-900">{product.stock}</dd>
-                <dd className="mt-1 text-xs text-gray-500">Threshold: {product.threshold}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><dt className="text-sm font-medium text-gray-500">Purchase Price</dt><dd className="mt-1 text-lg font-medium text-red-600">₹{product.purchasePrice}</dd></div>
-                <div><dt className="text-sm font-medium text-gray-500">Sale Price</dt><dd className="mt-1 text-lg font-bold text-green-600">₹{product.salePrice}</dd></div>
-              </div>
-            </dl>
-          </div>
-          <div className="px-4 py-5 sm:p-6 border-t border-gray-200 bg-gray-50 flex justify-center">
-            {product.imageUrl ? (
-              <img src={product.imageUrl} alt={product.name} className="h-64 object-contain rounded shadow bg-white" />
-            ) : (
-              <div className="h-64 w-full md:w-1/2 flex items-center justify-center bg-gray-200 text-gray-400 rounded">No Image</div>
-            )}
-          </div>
-        </div>
+        <div className="px-4 py-4 space-y-4">
 
-        <div className="bg-white shadow sm:rounded-lg mb-8">
-          <div className="px-4 py-5 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-              <h3 className="text-lg font-medium text-gray-900">Compatible Models</h3>
+          {/* MAIN CARD */}
+          <div className={`bg-white rounded-2xl shadow-sm border-l-4 p-5 ${
+            product?.status === 'out of stock' ? 'border-[#ED2939]' :
+            product?.status === 'low stock' ? 'border-orange-500' :
+            'border-green-500'
+          }`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-[#0f172a]">{product?.name}</h2>
+                <p className="text-gray-400 text-sm mt-0.5">
+                  {product?.brand && `${product?.brand} · `}{product?.category}
+                </p>
+                {product?.sku && (
+                  <p className="text-gray-400 text-xs mt-0.5">SKU: {product?.sku}</p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    product?.status === 'out of stock' ? 'bg-red-100 text-[#ED2939]' :
+                    product?.status === 'low stock' ? 'bg-orange-100 text-orange-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {(product?.status || '').charAt(0).toUpperCase() + (product?.status || '').slice(1)}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-600">
+                    {product?.stock} units
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-[#002395]">₹{product?.salePrice}</p>
+                {product?.purchasePrice && (
+                  <p className="text-xs text-gray-400">Cost: ₹{product?.purchasePrice}</p>
+                )}
+              </div>
             </div>
-            <div className="relative mb-4">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+
+            {/* ACTION BUTTONS */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowEdit(true)}
+                className="flex items-center gap-1.5 bg-[#002395]/10 text-[#002395] px-3 py-2 rounded-xl text-xs font-semibold"
+              >
+                <i className="fas fa-edit"></i> Edit
+              </button>
+              {labelEntry ? (
+                <button
+                  onClick={() => printLabel(labelEntry)}
+                  className="flex items-center gap-1.5 bg-[#ED2939]/10 text-[#ED2939] px-3 py-2 rounded-xl text-xs font-semibold"
+                >
+                  <i className="fas fa-print"></i> Print #{labelEntry.labelNumber}
+                </button>
+              ) : (
+                <button
+                  onClick={openLabelDialog}
+                  className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-xs font-semibold"
+                >
+                  <i className="fas fa-tag"></i> Assign Label
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* PRODUCT INFO */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Product Info
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {product?.brand && (
+                <div>
+                  <p className="text-xs text-gray-400">Brand</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{product?.brand}</p>
+                </div>
+              )}
+              {product?.category && (
+                <div>
+                  <p className="text-xs text-gray-400">Category</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{product?.category}</p>
+                </div>
+              )}
+              {product?.purchasePrice && (
+                <div>
+                  <p className="text-xs text-gray-400">Purchase Price</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">₹{product?.purchasePrice}</p>
+                </div>
+              )}
+              {product?.threshold && (
+                <div>
+                  <p className="text-xs text-gray-400">Low Stock Alert</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{product?.threshold} units</p>
+                </div>
+              )}
+            </div>
+            {product?.notes && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-400 mb-1">Notes</p>
+                <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3">{product?.notes}</p>
               </div>
-              <input
-                type="text"
-                placeholder="Search model..."
-                value={modelSearchQuery}
-                onChange={(e) => setModelSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            )}
+          </div>
+
+          {/* COMPATIBLE MODELS */}
+          {product?.compatibleModels?.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Compatible Models ({product?.compatibleModels?.length})
+              </p>
+              <div className="relative mb-3">
+                <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                <input
+                  type="text"
+                  placeholder="Search models..."
+                  value={modelSearchQuery}
+                  onChange={e => setModelSearchQuery(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+              {(() => {
+                const models = product?.compatibleModels || [];
+                const filtered = models.filter(m => (m || '').toLowerCase().includes(modelSearchQuery.toLowerCase()));
+                const displayed = showAllModels || modelSearchQuery ? filtered : filtered.slice(0, 20);
+                if (filtered.length === 0) return <p className="text-gray-400 text-sm">No models found</p>;
+                return (
+                  <div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {displayed.map((model, i) => (
+                        <span key={i} className="bg-[#002395]/10 text-[#002395] text-xs px-2.5 py-1 rounded-lg font-medium">
+                          {model}
+                        </span>
+                      ))}
+                    </div>
+                    {!showAllModels && !modelSearchQuery && filtered.length > 20 && (
+                      <button onClick={() => setShowAllModels(true)} className="mt-3 text-xs text-[#002395] font-semibold">
+                        Show all ({filtered.length})
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* PRODUCT IMAGE */}
+          {product?.imageUrl && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                Photo
+              </p>
+              <img
+                src={product?.imageUrl}
+                alt={product?.name}
+                className="w-full h-48 object-contain rounded-xl"
               />
             </div>
-            {(() => {
-              const models = product.compatibleModels || [];
-              if (models.length === 0) {
-                return <p className="text-gray-500 text-sm">Not specified</p>;
-              }
-              const filteredModels = models.filter(m => (m || '').toLowerCase().includes(modelSearchQuery.toLowerCase()));
-              const displayedModels = showAllModels || modelSearchQuery ? filteredModels : filteredModels.slice(0, 20);
-              
-              if (filteredModels.length === 0) {
-                 return <p className="text-gray-500 text-sm">No models found matching "{modelSearchQuery}"</p>;
-              }
+          )}
 
-              return (
-                <div>
-                  <div className="flex flex-wrap">
-                    {displayedModels.map((model, idx) => (
-                      <span key={idx} className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded mr-1 mb-1 inline-block">
-                        {model}
-                      </span>
-                    ))}
-                  </div>
-                  {!showAllModels && !modelSearchQuery && filteredModels.length > 20 && (
-                    <button
-                      onClick={() => setShowAllModels(true)}
-                      className="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                    >
-                      Show all ({filteredModels.length})
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
         </div>
 
+        {/* LABEL DIALOG */}
         {showLabelDialog && (
-          <div className="fixed z-50 inset-0 flex items-center justify-center">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowLabelDialog(false)}></div>
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 z-10">
-              <h3 className="text-lg font-bold mb-2">Assign Label Number</h3>
-              <p className="text-gray-600 mb-4">Assigning to <strong>{product.name}</strong>.</p>
-              <input type="number" value={labelInput} onChange={e => setLabelInput(e.target.value)} className="w-full border border-gray-300 rounded-md px-4 py-2 text-2xl font-bold mb-4" />
-              <div className="flex space-x-3">
-                <button onClick={confirmAssign} disabled={assigningLabel} className="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700 font-medium disabled:opacity-50">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+            <div className="fixed inset-0" onClick={() => setShowLabelDialog(false)}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+              <h3 className="text-xl font-bold text-[#0f172a] mb-2">Assign Label Number</h3>
+              <p className="text-[#64748b] text-sm mb-4">Assigning to <strong className="text-[#0f172a]">{product?.name}</strong>.</p>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" value={labelInput} onChange={e => setLabelInput(e.target.value)} className="w-full border-2 border-[#e2e8f0] focus:border-[#002395] outline-none rounded-xl px-4 py-3 text-2xl font-bold text-center mb-6 text-[#0f172a]" />
+              <div className="flex flex-col gap-3">
+                <button onClick={confirmAssign} disabled={assigningLabel} className="w-full bg-[#002395] text-white py-3 rounded-xl font-bold disabled:opacity-50">
                   {assigningLabel ? 'Assigning...' : `Confirm #${labelInput}`}
                 </button>
-                <button onClick={() => setShowLabelDialog(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-md hover:bg-gray-300">Cancel</button>
+                <button onClick={() => setShowLabelDialog(false)} className="w-full bg-white border-2 border-[#e2e8f0] text-[#64748b] py-3 rounded-xl font-bold">
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {showEdit && (
-          <div className="fixed z-10 inset-0 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4">
-              <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowEdit(false)}></div>
-              <div className="relative bg-white rounded-lg shadow-xl sm:max-w-2xl w-full">
-                <div className="px-4 pt-5 pb-4 sm:p-6">
-                  <h3 className="text-lg font-medium mb-5">Edit Product</h3>
-                  <div className="max-h-[75vh] overflow-y-auto px-2">
-                    <ProductForm initialData={product} onSave={handleUpdate} onCancel={() => setShowEdit(false)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ProductForm initialData={product} onSave={handleUpdate} onCancel={() => setShowEdit(false)} />
         )}
+
       </div>
     </Layout>
   );

@@ -75,122 +75,156 @@ const ProductList = () => {
 
   const statusColor = (s) => ({ 'in stock': 'bg-green-100 text-green-800', 'low stock': 'bg-yellow-100 text-yellow-800', 'out of stock': 'bg-red-100 text-red-800' }[s] || 'bg-gray-100 text-gray-800');
 
-  return (
-    <Layout title="Products Inventory">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products Inventory</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{products.length} products</p>
+  const fab = (
+    <button
+      onClick={() => setShowModal(true)}
+      className="fixed bottom-20 right-6 w-14 h-14 bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden z-40"
+      style={{ borderRadius: '50%', boxShadow: '0 4px 6px -1px rgba(0, 35, 149, 0.1), 0 2px 4px -1px rgba(0, 35, 149, 0.06)' }}
+      aria-label="Add Product"
+    >
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+    </button>
+  );
+
+  
+  useEffect(() => {
+    if (showModal || deleteTarget) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [showModal, deleteTarget]);
+return (
+    <Layout title="Products Inventory" pageType="list" fab={fab}>
+      <div className="min-h-screen bg-[#f8fafc] pb-24">
+
+        {/* HEADER */}
+        <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-[#0f172a]">Products</h1>
+            <span className="bg-[#002395] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+              {products.length}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="hidden md:flex items-center gap-2 bg-[#002395] text-white px-4 py-2 rounded-xl text-sm font-semibold"
+          >
+            <i className="fas fa-plus"></i> Add Product
+          </button>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm shrink-0">+ New Product</button>
-      </div>
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <input type="text" placeholder="Search name, brand, category, compatible models..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm" />
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm">
-          <option value="">All Categories</option>
-          {['Charger','Cable','Earphones','Back Cover','Screen Guard','Battery','Memory Card','Power Bank','Other'].map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm">
-          <option value="">All Statuses</option>
-          <option value="in stock">In Stock</option>
-          <option value="low stock">Low Stock</option>
-          <option value="out of stock">Out of Stock</option>
-        </select>
-        <button onClick={() => { setSearchQuery(''); setCategoryFilter(''); setStatusFilter(''); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 shrink-0">Clear</button>
-      </div>
-
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse" />)}</div>
-      ) : (
-        <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Product</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Category</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Prices</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Stock</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase text-xs">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {filteredProducts.map(p => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      {p.imageUrl ? (
-                        <img className="h-9 w-9 rounded-full object-cover shrink-0" src={p.imageUrl} alt="" />
-                      ) : (
-                        <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">{(p.name || '?').charAt(0)}</div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="font-medium text-gray-900 flex items-center gap-2">
-                          <span className="truncate">{p.name}</span>
-                          {p.compatibleModels && p.compatibleModels.length > 0 && (
-                            <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0">
-                              {p.compatibleModels.length} models
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-400 truncate">{p.brand}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{p.category}</td>
-                  <td className="px-4 py-3 whitespace-nowrap hidden md:table-cell">
-                    <div className="text-gray-400 text-xs">Buy: ₹{p.purchasePrice}</div>
-                    <div className="font-medium text-green-600">₹{p.salePrice}</div>
-                  </td>
-                  <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">{p.stock}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(p.status)}`}>{(p.status || '').toUpperCase()}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link to={`/products/${p.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View</Link>
-                    {userRole === 'admin' && (
-                      <button
-                        onClick={() => setDeleteTarget(p)}
-                        title="Delete product"
-                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredProducts.length === 0 && (
-                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-400">No products found.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-0 sm:p-4">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setShowModal(false)} />
-          <div className="relative w-full sm:max-w-2xl sm:rounded-xl bg-white shadow-2xl z-10 flex flex-col max-h-screen sm:max-h-[90vh]">
-            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white sm:rounded-t-xl">
-              <h3 className="text-lg font-semibold">Add New Product</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 p-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-5 py-4">
-              <ProductForm onSave={handleSaveProduct} onCancel={() => setShowModal(false)} />
-            </div>
+        {/* SEARCH AND FILTERS */}
+        <div className="px-4 pt-3 pb-2 space-y-2">
+          <div className="relative">
+            <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            <input
+              type="text"
+              placeholder="Search by name, brand, model..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] shadow-sm"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+            >
+              <option value="">All Categories</option>
+              <option value="Back Cover">Back Cover</option>
+              <option value="Battery">Battery</option>
+              <option value="Cable">Cable</option>
+              <option value="Charger">Charger</option>
+              <option value="Earphones">Earphones</option>
+              <option value="Memory Card">Memory Card</option>
+              <option value="Power Bank">Power Bank</option>
+              <option value="Screen Guard">Screen Guard</option>
+              <option value="Tempered Glass">Tempered Glass</option>
+              <option value="Other">Other</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+            >
+              <option value="">All Status</option>
+              <option value="in stock">In Stock</option>
+              <option value="low stock">Low Stock</option>
+              <option value="out of stock">Out of Stock</option>
+            </select>
           </div>
         </div>
-      )}
-      <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Product"
-        message="Are you sure you want to delete this product? This action cannot be undone."
-      />
+
+        {/* PRODUCT CARDS */}
+        <div className="px-4 space-y-3">
+          {loading ? (
+            <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-2xl h-24 animate-pulse" />)}</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-16">
+              <i className="fas fa-box text-4xl text-gray-200 mb-3 block"></i>
+              <p className="text-gray-400 text-sm">No products found</p>
+            </div>
+          ) : (
+            filteredProducts.map(p => (
+              <Link
+                key={p.id}
+                to={`/products/${p.id}`}
+                className={`block bg-white rounded-2xl border-l-4 shadow-sm p-4 active:scale-95 transition ${
+                  p.status === 'out of stock' ? 'border-[#ED2939]' :
+                  p.status === 'low stock' ? 'border-orange-500' :
+                  'border-green-500'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-[#0f172a] text-sm">{p.name}</p>
+                      {p.compatibleModels?.length > 0 && (
+                        <span className="bg-[#002395]/10 text-[#002395] text-xs px-2 py-0.5 rounded-full">
+                          {p.compatibleModels.length} models
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      {p.brand && `${p.brand} · `}{p.category}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        p.status === 'out of stock' ? 'bg-red-100 text-[#ED2939]' :
+                        p.status === 'low stock' ? 'bg-orange-100 text-orange-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
+                        {(p.status || '').charAt(0).toUpperCase() + (p.status || '').slice(1)}
+                      </span>
+                      <span className="text-xs text-gray-400">{p.stock} units</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="font-bold text-[#002395] text-base">₹{p.salePrice}</p>
+                    <i className="fas fa-chevron-right text-gray-300 text-xs"></i>
+                  </div>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+
+        {showModal && (
+            <ProductForm onSave={handleSaveProduct} onCancel={() => setShowModal(false)} />
+          )}
+
+        <ConfirmDeleteModal
+          isOpen={!!deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          deleting={deleting}
+          title="Delete Product"
+          message="Are you sure you want to delete this product? This action cannot be undone."
+        />
+      </div>
     </Layout>
   );
 };

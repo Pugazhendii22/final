@@ -80,94 +80,160 @@ const SalesList = () => {
     return matchesSearch && matchesFrom && matchesTo;
   });
 
-  return (
-    <Layout title="Sales & Billing">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+  useEffect(() => {
+    if (showModal || deleteTarget) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [showModal, deleteTarget]);
+
+  const fab = (
+    <button
+      onClick={() => setShowModal(true)}
+      className="w-14 h-14 rounded-full bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden z-40"
+      style={{ boxShadow: '0 4px 12px rgba(0, 35, 149, 0.18)' }}
+      aria-label="New Sale"
+    >
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+    </button>
+  );
+
+return (
+  <Layout title="Sales" pageType="list" fab={fab}>
+    <div className="min-h-screen bg-[#f8fafc]">
+
+      {/* HEADER */}
+      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-bold text-[#0f172a]">Sales</h1>
+        <span className="bg-[#002395] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+          {sales.length}
+        </span>
+      </div>
+      <button
+        onClick={() => setShowModal(true)}
+        className="hidden md:flex items-center gap-2 bg-[#002395] text-white px-4 py-2 rounded-xl text-sm font-semibold"
+      >
+        <i className="fas fa-plus"></i> New Sale
+      </button>
+    </div>
+
+    {/* DATE FILTER */}
+    <div className="px-4 pt-3 pb-2">
+      <div className="flex items-center justify-between gap-3 mb-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sales &amp; Billing</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{sales.length} total records</p>
+          <p className="text-sm font-semibold text-[#002395]">Select dates</p>
+          <p className="text-xs text-gray-500">Filter sales by start and end date</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm shrink-0">
-          + New Sale
+        <button
+          type="button"
+          onClick={() => { setFromDate(''); setToDate(''); }}
+          className="text-sm font-semibold text-[#ED2939] bg-[#ED2939]/10 px-3 py-2 rounded-xl hover:bg-[#ED2939]/15 transition"
+        >
+          Clear
         </button>
       </div>
-
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <input type="text" placeholder="Search invoice, customer, phone..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm" />
-        <div className="flex gap-2 items-center">
-          <label className="text-xs text-gray-500 shrink-0">From</label>
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs text-gray-500 mb-1">From</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={e => setFromDate(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
-        <div className="flex gap-2 items-center">
-          <label className="text-xs text-gray-500 shrink-0">To</label>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+        <div className="flex-1">
+          <label className="block text-xs text-gray-500 mb-1">To</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={e => setToDate(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
-        <button onClick={() => { setSearchQuery(''); setFromDate(''); setToDate(''); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 shrink-0">Clear</button>
       </div>
+    </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse" />)}</div>
-      ) : (
-        <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Invoice #</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Customer</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Items</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Total</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Payment</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase text-xs">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {filteredSales.map(s => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-semibold text-indigo-600 whitespace-nowrap">{s.invoiceNumber}</td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{s.date ? new Date(s.date).toLocaleDateString() : '-'}</td>
-                  <td className="px-4 py-3 text-gray-900 whitespace-nowrap">
-                    <div className="font-medium">{s.customerName}</div>
-                    <div className="text-xs text-gray-400">{s.customerPhone}</div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{s.items?.length || 0} item(s)</td>
-                  <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">₹{s.totalAmount}</td>
-                  <td className="px-4 py-3 whitespace-nowrap hidden md:table-cell">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">{s.paymentMethod}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link to={`/sales/${s.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View</Link>
-                    {userRole === 'admin' && (
-                      <button
-                        onClick={() => setDeleteTarget(s)}
-                        title="Delete sale"
-                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredSales.length === 0 && (
-                <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-400">No sales found.</td></tr>
-              )}
-            </tbody>
-          </table>
+    {/* SEARCH */}
+    <div className="px-4 pb-3">
+      <div className="relative">
+        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input
+          type="text"
+          placeholder="Search by name, phone, invoice..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] shadow-sm"
+        />
+      </div>
+    </div>
+
+    {/* SALES CARDS */}
+    <div className="px-4 space-y-3">
+      {filteredSales.length === 0 ? (
+        <div className="text-center py-16">
+          <i className="fas fa-receipt text-4xl text-gray-200 mb-3 block"></i>
+          <p className="text-gray-400 text-sm">No sales found</p>
         </div>
+      ) : (
+        filteredSales.map(sale => (
+          <Link
+            key={sale.id}
+            to={`/sales/${sale.id}`}
+            className="bg-white rounded-2xl border-l-4 border-[#002395] shadow-sm p-4 cursor-pointer active:scale-95 transition block"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs font-bold text-[#002395] font-mono">{sale.invoiceNumber}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    sale.saleType === 'Second-hand' ? 'bg-[#002395]/10 text-[#002395]' :
+                    sale.saleType === 'Service' ? 'bg-purple-100 text-purple-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {sale.saleType || 'Sale'}
+                  </span>
+                </div>
+                <p className="font-semibold text-[#0f172a] text-sm mt-1">{sale.customerName}</p>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  {sale.createdAt?.toDate?.()?.toLocaleDateString('en-IN')}
+                  {sale.paymentMethod && ` · ${sale.paymentMethod}`}
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <p className="font-bold text-[#002395] text-base">₹{sale.totalAmount}</p>
+                {sale.balanceDue > 0 ? (
+                  <span className="text-xs bg-[#ED2939]/10 text-[#ED2939] px-2 py-0.5 rounded-full font-medium">
+                    Due ₹{sale.balanceDue}
+                  </span>
+                ) : (
+                  <span className="text-xs text-green-600">
+                    <i className="fas fa-check-circle mr-1"></i>Paid
+                  </span>
+                )}
+              </div>
+            </div>
+          </Link>
+        ))
       )}
+    </div>
 
-      <NewSaleModal isOpen={showModal} onClose={() => { setShowModal(false); setPrefillData(null); }} onSuccess={fetchData} prefillData={prefillData} />
-      <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Sale"
-        message="Deleting this sale will not restore stock automatically. This action cannot be undone."
+    {/* NEW SALE MODAL */}
+    {showModal && (
+      <NewSaleModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={fetchData}
+        prefillData={prefillData}
       />
-    </Layout>
-  );
+    )}
+
+  </div>
+  </Layout>
+);
 };
 
 export default SalesList;

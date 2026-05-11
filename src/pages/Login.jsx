@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ const Login = () => {
 
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Check isActive status manually to prevent dashboard flash
       const userDocRef = doc(db, 'users', userCred.user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -46,15 +47,15 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-xl shadow-lg border border-gray-100">
+    <div className="flex items-center justify-center min-h-screen bg-[#f8fafc]">
+      <div className="w-full max-w-md p-6 md:p-10 space-y-8 bg-white rounded-2xl shadow-xl border border-[#e2e8f0] break-words">
         <div className="text-center">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">French Mobiles</h2>
-          <p className="mt-2 text-sm text-gray-600">Admin Portal Login</p>
+          <h2 className="text-4xl font-extrabold text-[#002395] tracking-tight">French Mobiles</h2>
+          <p className="mt-2 text-sm text-[#64748b] font-medium">Admin Portal Login</p>
         </div>
-        
+
         {error && (
-          <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg" role="alert">
+          <div className="p-4 text-sm font-bold text-[#ED2939] bg-red-50 border border-red-200 rounded-xl break-words" role="alert">
             {error}
           </div>
         )}
@@ -67,7 +68,7 @@ const Login = () => {
                 <input
                   type="email"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 focus:bg-white"
+                  className="w-full px-4 py-3 border-2 border-[#e2e8f0] rounded-xl focus:border-[#002395] transition-colors bg-white focus:outline-none font-medium text-[#0f172a] break-words"
                   placeholder="admin@frenchmobiles.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -76,15 +77,22 @@ const Login = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Password</label>
-              <div className="mt-1">
+              <div className="relative mt-1">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 focus:bg-white"
+                  className="w-full pr-24 pl-4 py-3 border-2 border-[#e2e8f0] rounded-xl focus:border-[#002395] transition-colors bg-white focus:outline-none font-medium text-[#0f172a] break-words"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#002395] hover:text-[#001a7a] focus:outline-none"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
               </div>
             </div>
           </div>
@@ -93,7 +101,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-sm text-sm font-bold text-white bg-[#002395] hover:bg-[#001a7a] focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed transition-colors break-words"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>

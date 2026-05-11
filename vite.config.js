@@ -60,6 +60,19 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          'pdf-vendor': ['jspdf', 'html2canvas'],
+          'qr-vendor': ['html5-qrcode', '@zxing/library'],
+          'ui-vendor': ['react', 'react-dom', 'react-router-dom']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,

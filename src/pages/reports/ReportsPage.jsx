@@ -144,7 +144,11 @@ const ReportsPage = () => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading reports...</div>;
+  if (loading) return (
+    <Layout title="Management Reports" pageType="list">
+      <div className="p-4 md:p-8 text-center text-gray-500">Loading reports...</div>
+    </Layout>
+  );
 
   const currentDateTime = new Date().toLocaleString();
 
@@ -186,27 +190,30 @@ const ReportsPage = () => {
   const regularCust = customers.filter(c => c.isRegular).length;
 
   return (
-    <Layout title="Management Reports">
-      <div className="max-w-7xl mx-auto print:p-0">
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col sm:flex-row gap-4 items-end no-print">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">From Date</label>
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="border border-gray-300 rounded px-3 py-2" />
+    <Layout title="Management Reports" pageType="list">
+      <div className="min-h-screen bg-[#f8fafc] pb-20 flex-1 min-w-0">
+      <div className="px-4 md:px-8 py-4 max-w-7xl mx-auto print:p-0 flex-1 min-w-0">
+        <div className="flex flex-col md:flex-row gap-3 mb-6 bg-white rounded-2xl p-4 border border-[#e2e8f0] shadow-sm no-print break-words">
+          <div className="flex-1">
+            <label className="text-xs font-bold text-[#64748b] uppercase mb-1 block">From Date</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full border border-[#e2e8f0] rounded-xl px-4 py-2.5 focus:border-[#002395] break-words" />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">To Date</label>
-            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="border border-gray-300 rounded px-3 py-2" />
+          <div className="flex-1">
+            <label className="text-xs font-bold text-[#64748b] uppercase mb-1 block">To Date</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full border border-[#e2e8f0] rounded-xl px-4 py-2.5 focus:border-[#002395] break-words" />
           </div>
-          <button onClick={() => {setFromDate(''); setToDate('');}} className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-50">Clear Filters</button>
+          <div className="flex items-end">
+            <button onClick={() => {setFromDate(''); setToDate('');}} className="w-full md:w-auto bg-[#002395] text-white rounded-xl px-6 py-2.5 font-semibold break-words">Clear Filters</button>
+          </div>
         </div>
 
-        <div className="mb-6 border-b border-gray-200 no-print">
-          <nav className="-mb-px flex space-x-8">
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 no-print">
+          <nav className="flex gap-2">
             {['Sales', 'Service', 'Inventory', 'Customers'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`${activeTab === tab ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold ${activeTab === tab ? 'bg-[#002395] text-white' : 'bg-white border border-[#e2e8f0] text-[#64748b]'}`}
               >
                 {tab} Report
               </button>
@@ -214,13 +221,13 @@ const ReportsPage = () => {
           </nav>
         </div>
 
-        <div className="bg-white shadow rounded-lg p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4 break-words">
           <div className="flex justify-between items-center mb-6 no-print">
             <h2 className="text-2xl font-bold text-gray-900">{activeTab} Report</h2>
             <button
               onClick={() => handlePrintSection(`section-${activeTab}`)}
               disabled={!dataLoaded || printing}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center no-print disabled:opacity-60 disabled:cursor-not-allowed"
+              className="bg-[#002395] text-white px-5 py-2.5 rounded-xl hover:bg-[#001a7a] flex items-center no-print disabled:opacity-60 disabled:cursor-not-allowed font-semibold transition break-words"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
               {printing ? 'Preparing...' : !dataLoaded ? 'Loading...' : 'Print Report'}
@@ -230,93 +237,200 @@ const ReportsPage = () => {
           <div id="report-print-area">
             <div id="section-Sales" className={activeTab !== 'Sales' ? 'hidden' : ''}>
               <h2 className="text-lg font-bold border-b mb-4 hidden print:block">Sales Report</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 stats-grid">
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-gray-500 stat-label">Total Sales</p><p className="text-lg font-bold stat-value">{filteredSales.length}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-green-700 stat-label">Total Revenue</p><p className="text-lg font-bold text-green-700 stat-value">₹{totalSalesRev}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-blue-700 stat-label">New Product Rev</p><p className="text-lg font-bold text-blue-700 stat-value">₹{newProdRev}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-purple-700 stat-label">2nd-Hand Rev</p><p className="text-lg font-bold text-purple-700 stat-value">₹{shRev}</p></div>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4 stats-grid">
+                <h3 className="text-md font-semibold mb-4 hidden print:block">Sales Stats</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Sales</p><p className="text-xl font-bold text-[#002395] stat-value">{filteredSales.length}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Revenue</p><p className="text-xl font-bold text-[#002395] stat-value">₹{totalSalesRev}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">New Product Rev</p><p className="text-xl font-bold text-[#002395] stat-value">₹{newProdRev}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">2nd-Hand Rev</p><p className="text-xl font-bold text-[#002395] stat-value">₹{shRev}</p></div>
+                </div>
               </div>
               
-              <h3 className="text-md font-semibold mb-4">Payment Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-sm stats-grid">
-                <div className="border p-3 rounded stat-card">Cash: <span className="font-bold">₹{payCash}</span></div>
-                <div className="border p-3 rounded stat-card">UPI: <span className="font-bold">₹{payUpi}</span></div>
-                <div className="border p-3 rounded stat-card">Card: <span className="font-bold">₹{payCard}</span></div>
-                <div className="border p-3 rounded stat-card">Split: <span className="font-bold">₹{paySplit}</span></div>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4">
+                <h3 className="border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase mb-4 flex items-center justify-between">Payment Breakdown</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 text-sm text-[#64748b] flex-shrink-0">Cash</span>
+                    <div className="flex-1 bg-[#f8fafc] rounded-full h-3"><div className="bg-[#002395] h-3 rounded-full" style={{ width: `${totalSalesRev ? (payCash / totalSalesRev) * 100 : 0}%` }}></div></div>
+                    <span className="text-sm font-bold text-[#0f172a] w-8 text-right flex-shrink-0">{payCash ? Math.round(payCash / 1000) : 0}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 text-sm text-[#64748b] flex-shrink-0">UPI</span>
+                    <div className="flex-1 bg-[#f8fafc] rounded-full h-3"><div className="bg-[#002395] h-3 rounded-full" style={{ width: `${totalSalesRev ? (payUpi / totalSalesRev) * 100 : 0}%` }}></div></div>
+                    <span className="text-sm font-bold text-[#0f172a] w-8 text-right flex-shrink-0">{payUpi ? Math.round(payUpi / 1000) : 0}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 text-sm text-[#64748b] flex-shrink-0">Card</span>
+                    <div className="flex-1 bg-[#f8fafc] rounded-full h-3"><div className="bg-[#002395] h-3 rounded-full" style={{ width: `${totalSalesRev ? (payCard / totalSalesRev) * 100 : 0}%` }}></div></div>
+                    <span className="text-sm font-bold text-[#0f172a] w-8 text-right flex-shrink-0">{payCard ? Math.round(payCard / 1000) : 0}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 text-sm text-[#64748b] flex-shrink-0">Split</span>
+                    <div className="flex-1 bg-[#f8fafc] rounded-full h-3"><div className="bg-[#002395] h-3 rounded-full" style={{ width: `${totalSalesRev ? (paySplit / totalSalesRev) * 100 : 0}%` }}></div></div>
+                    <span className="text-sm font-bold text-[#0f172a] w-8 text-right flex-shrink-0">{paySplit ? Math.round(paySplit / 1000) : 0}</span>
+                  </div>
+                </div>
               </div>
 
-              <h3 className="text-md font-semibold mb-4">Sales List</h3>
-              <table className="min-w-full divide-y divide-gray-200 border-collapse border">
-                <thead><tr><th className="p-2 text-left font-bold border">Date</th><th className="p-2 text-left font-bold border">Invoice</th><th className="p-2 text-left font-bold border">Customer</th><th className="p-2 text-left font-bold border">Amount</th></tr></thead>
-                <tbody>
-                  {filteredSales.map(s => (
-                    <tr key={s.id}><td className="p-2 border">{new Date(s.createdAt).toLocaleDateString()}</td><td className="p-2 border">{s.invoiceNumber}</td><td className="p-2 border">{s.customerName}</td><td className="p-2 font-bold border">₹{s.totalAmount}</td></tr>
-                  ))}
-                  {filteredSales.length === 0 && <tr><td colSpan="4" className="p-2 text-center text-gray-500 border">No sales found in this range.</td></tr>}
-                </tbody>
-              </table>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4">
+                <h3 className="border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase mb-4 flex items-center justify-between">Sales List</h3>
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full" style={{minWidth: '600px'}}>
+                    <thead className="bg-[#002395] text-white text-xs font-bold uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Invoice</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Customer</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredSales.map(s => (
+                        <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-3 py-2 text-sm break-words">{new Date(s.createdAt).toLocaleDateString()}</td>
+                          <td className="px-3 py-2 text-sm break-words">{s.invoiceNumber}</td>
+                          <td className="px-3 py-2 text-sm break-words">{s.customerName}</td>
+                          <td className="px-3 py-2 text-sm break-words font-bold">₹{s.totalAmount}</td>
+                        </tr>
+                      ))}
+                      {filteredSales.length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="px-3 py-2 text-sm break-words text-center text-gray-500">No sales found in this range.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             <div id="section-Service" className={activeTab !== 'Service' ? 'hidden' : ''}>
               <h2 className="text-lg font-bold border-b mb-4 hidden print:block">Service Report</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 stats-grid">
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-gray-500 stat-label">Total Orders</p><p className="text-lg font-bold stat-value">{filteredSrv.length}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-green-700 stat-label">Total Revenue</p><p className="text-lg font-bold text-green-700 stat-value">₹{totalSrvRev}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card">
-                  <p className="text-sm text-gray-500 stat-label">Status</p>
-                  <p className="text-sm mt-1">Completed: <span className="font-bold">{srvStatus.completed}</span> | Pending: <span className="font-bold">{srvStatus.pending}</span> | Returned: <span className="font-bold">{srvStatus.returned}</span></p>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4 stats-grid">
+                <h3 className="text-md font-semibold mb-4 hidden print:block">Service Stats</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Orders</p><p className="text-xl font-bold text-[#002395] stat-value">{filteredSrv.length}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Revenue</p><p className="text-xl font-bold text-[#002395] stat-value">₹{totalSrvRev}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words">
+                    <p className="text-xs text-[#64748b] mb-1 stat-label">Status Overview</p>
+                    <p className="text-sm mt-1">Completed: <span className="font-bold">{srvStatus.completed}</span> | Pending: <span className="font-bold">{srvStatus.pending}</span> | Returned: <span className="font-bold">{srvStatus.returned}</span></p>
+                  </div>
                 </div>
               </div>
 
-              <h3 className="text-md font-semibold mb-4">Service Orders List</h3>
-              <table className="min-w-full divide-y divide-gray-200 border-collapse border">
-                <thead><tr><th className="p-2 text-left font-bold border">Date</th><th className="p-2 text-left font-bold border">Order</th><th className="p-2 text-left font-bold border">Customer</th><th className="p-2 text-left font-bold border">Status</th><th className="p-2 text-left font-bold border">Amount</th><th className="p-2 text-left font-bold border">Advance Paid</th></tr></thead>
-                <tbody>
-                  {filteredSrv.map(s => (
-                    <tr key={s.id}><td className="p-2 border">{new Date(s.createdAt).toLocaleDateString()}</td><td className="p-2 border">{s.orderNumber}</td><td className="p-2 border">{s.customerName}</td><td className="p-2 border">{s.status}</td><td className="p-2 font-bold border">₹{s.estimatedPrice || 0}</td><td className="p-2 border">₹{s.advancePaid || 0}</td></tr>
-                  ))}
-                  {filteredSrv.length === 0 && <tr><td colSpan="6" className="p-2 text-center text-gray-500 border">No service orders found in this range.</td></tr>}
-                </tbody>
-              </table>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4">
+                <h3 className="border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase mb-4 flex items-center justify-between">Service Orders List</h3>
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full" style={{minWidth: '600px'}}>
+                    <thead className="bg-[#002395] text-white text-xs font-bold uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Order</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Customer</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Status</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Amount</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Advance Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredSrv.map(s => (
+                        <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-3 py-2 text-sm break-words">{new Date(s.createdAt).toLocaleDateString()}</td>
+                          <td className="px-3 py-2 text-sm break-words">{s.orderNumber}</td>
+                          <td className="px-3 py-2 text-sm break-words">{s.customerName}</td>
+                          <td className="px-3 py-2 text-sm break-words">
+                            <span className="whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#002395]">
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-sm break-words font-bold">₹{s.estimatedPrice || 0}</td>
+                          <td className="px-3 py-2 text-sm break-words">₹{s.advancePaid || 0}</td>
+                        </tr>
+                      ))}
+                      {filteredSrv.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="px-3 py-2 text-sm break-words text-center text-gray-500">No service orders found in this range.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             <div id="section-Inventory" className={activeTab !== 'Inventory' ? 'hidden' : ''}>
               <h2 className="text-lg font-bold border-b mb-4 hidden print:block">Inventory Report</h2>
-              <h3 className="text-md font-semibold mb-4">Second-Hand Mobiles</h3>
-              <div className="grid grid-cols-2 gap-4 mb-8 stats-grid">
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-green-700 stat-label">Available</p><p className="text-lg font-bold text-green-700 stat-value">{shAvailable}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-gray-500 stat-label">Sold</p><p className="text-lg font-bold text-gray-700 stat-value">{shSold}</p></div>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4 stats-grid">
+                <h3 className="border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase mb-4 flex items-center justify-between">Second-Hand Mobiles Stats</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Available</p><p className="text-xl font-bold text-[#002395] stat-value">{shAvailable}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Sold</p><p className="text-xl font-bold text-[#002395] stat-value">{shSold}</p></div>
+                </div>
               </div>
 
-              <h3 className="text-md font-semibold mb-4">Products (Accessories/New)</h3>
-              <div className="grid grid-cols-3 gap-4 mb-8 stats-grid">
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-green-700 stat-label">In Stock</p><p className="text-lg font-bold text-green-700 stat-value">{prodInStock}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-yellow-700 stat-label">Low Stock</p><p className="text-lg font-bold text-yellow-700 stat-value">{prodLowStock}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-red-700 stat-label">Out of Stock</p><p className="text-lg font-bold text-red-700 stat-value">{prodOutStock}</p></div>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4 stats-grid">
+                <h3 className="border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase mb-4 flex items-center justify-between">Products (Accessories/New)</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">In Stock</p><p className="text-xl font-bold text-[#002395] stat-value">{prodInStock}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Low Stock</p><p className="text-xl font-bold text-[#002395] stat-value">{prodLowStock}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Out of Stock</p><p className="text-xl font-bold text-[#002395] stat-value">{prodOutStock}</p></div>
+                </div>
               </div>
 
-              <h3 className="text-md font-semibold mb-4">Available Second-Hand Devices</h3>
-              <table className="min-w-full divide-y divide-gray-200 border-collapse border">
-                <thead><tr><th className="p-2 text-left font-bold border">Brand/Model</th><th className="p-2 text-left font-bold border">Specs</th><th className="p-2 text-left font-bold border">Price</th></tr></thead>
-                <tbody>
-                  {secondHand.filter(s => s.status !== 'sold').map(s => (
-                    <tr key={s.id}><td className="p-2 border">{s.brand} {s.model}</td><td className="p-2 border">{s.ram} / {s.rom}</td><td className="p-2 font-bold border">₹{s.salePrice}</td></tr>
-                  ))}
-                  {secondHand.filter(s => s.status !== 'sold').length === 0 && <tr><td colSpan="3" className="p-2 text-center text-gray-500 border">No devices available.</td></tr>}
-                </tbody>
-              </table>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4">
+                <h3 className="border-l-4 border-[#002395] pl-3 text-[#002395] font-bold text-sm uppercase mb-4 flex items-center justify-between">Available Second-Hand Devices</h3>
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full" style={{minWidth: '600px'}}>
+                    <thead className="bg-[#002395] text-white text-xs font-bold uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Brand/Model</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Specs</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {secondHand.filter(s => s.status !== 'sold').map(s => (
+                        <tr key={s.id}>
+                          <td className="px-3 py-2 text-sm break-words">{s.brand} {s.model}</td>
+                          <td className="px-3 py-2 text-sm break-words">{s.ram} / {s.rom}</td>
+                          <td className="px-3 py-2 text-sm break-words font-bold">₹{s.salePrice}</td>
+                        </tr>
+                      ))}
+                      {secondHand.filter(s => s.status !== 'sold').length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="px-3 py-2 text-sm break-words text-center text-gray-500">No devices available.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             <div id="section-Customers" className={activeTab !== 'Customers' ? 'hidden' : ''}>
               <h2 className="text-lg font-bold border-b mb-4 hidden print:block">Customers Report</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 stats-grid">
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-gray-500 stat-label">Total Customers</p><p className="text-lg font-bold stat-value">{customers.length}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-indigo-700 stat-label">New (in range)</p><p className="text-lg font-bold text-indigo-700 stat-value">{filteredCust.length}</p></div>
-                <div className="bg-gray-50 border p-4 rounded stat-card"><p className="text-sm text-purple-700 stat-label">Regular Customers</p><p className="text-lg font-bold text-purple-700 stat-value">{regularCust}</p></div>
+              <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] p-4 md:p-6 mb-4 stats-grid">
+                <h3 className="text-md font-semibold mb-4 hidden print:block">Customer Stats</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Customers</p><p className="text-xl font-bold text-[#002395] stat-value">{customers.length}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">New (in range)</p><p className="text-xl font-bold text-[#002395] stat-value">{filteredCust.length}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Regular Customers</p><p className="text-xl font-bold text-[#002395] stat-value">{regularCust}</p></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
+      <div className="fixed bottom-20 left-4 right-4 md:hidden no-print z-40">
+        <button
+          onClick={() => handlePrintSection(`section-${activeTab}`)}
+          disabled={!dataLoaded || printing}
+          className="w-full bg-[#002395] text-white rounded-xl py-3 font-bold shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <i className="fas fa-print mr-2"></i>Print Full Report
+        </button>
+      </div>
       </div>
     </Layout>
   );

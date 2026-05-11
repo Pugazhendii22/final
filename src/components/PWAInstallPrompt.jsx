@@ -42,7 +42,7 @@ const PWAInstallPrompt = () => {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 flex justify-between items-center z-50 shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 flex justify-between items-center z-50 shadow-lg break-words">
       <div className="text-sm font-medium pr-4">
         Install French Mobiles app for better experience
       </div>
@@ -55,7 +55,7 @@ const PWAInstallPrompt = () => {
         </button>
         <button 
           onClick={handleInstallClick} 
-          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm"
+          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm break-words"
         >
           Install
         </button>

@@ -2,50 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-@media screen {
-  #print-label-root {
-    position: fixed;
-    top: -9999px;
-    left: -9999px;
-    opacity: 0;
-    pointer-events: none;
-    z-index: -1;
-  }
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-@media print {
-
-  /* Hide entire page by default */
-  body>* {
-    display: none !important;
-  }
-
-  /* Label printing — 100x50mm */
-  body>#print-label-root {
-    display: block !important;
-    position: static !important;
-    opacity: 1 !important;
-    top: 0 !important;
-    left: 0 !important;
-    z-index: auto !important;
-  }
-
-  /* Report printing — A4 */
-  body>#report-print-overlay {
-    display: block !important;
-    position: static !important;
-  }
-
-  /* Invoice printing — A4 */
-  body>#invoice-print-overlay {
-    display: block !important;
-    position: static !important;
-  }
-
-  /* Label size override only when printing labels */
-  body>#print-label-root~* {
-    display: none !important;
-  }
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
-/* Page size is set per-overlay via inline <style> tags injected at print time */
+
+input, select, textarea {
+  font-size: 16px !important;
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+}
+
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+    transform: none !important;
+  }
+}

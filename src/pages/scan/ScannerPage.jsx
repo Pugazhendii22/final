@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeScanType, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
@@ -29,7 +29,7 @@ const ScannerPage = () => {
           setError('Invalid barcode format. Expected a numeric label.');
         }
       },
-      (errorMessage) => {
+      () => {
         // Ignore background failures
       }
     );
@@ -40,23 +40,31 @@ const ScannerPage = () => {
   }, [navigate]);
 
   return (
-    <Layout title="Internal Scanner">
-      <div className="flex flex-col items-center">
+  <Layout title="Scan Label">
+    <div className="bg-[#0f172a] min-h-screen">
+      <div className="px-4 py-4 space-y-4">
 
-      <div className="w-full max-w-md bg-white shadow-lg rounded-xl overflow-hidden border border-gray-200">
-        <div className="bg-indigo-600 p-6 text-center">
-          <h1 className="text-2xl font-bold text-white uppercase tracking-widest">Internal Scanner</h1>
-          <p className="text-indigo-100 mt-1">Scan French Mobiles Barcode Label</p>
+        {/* SCANNER AREA */}
+        <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-[#002395] px-4 py-3 flex items-center gap-2">
+            <i className="fas fa-qrcode text-white"></i>
+            <p className="text-white font-semibold text-sm">Point camera at barcode</p>
+          </div>
+          <div id="reader" className="w-full"></div>
         </div>
 
-        <div className="p-6">
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded mb-4 text-sm text-center">{error}</div>}
-          <div id="reader" className="w-full overflow-hidden rounded-lg"></div>
-        </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl shadow-sm p-4">
+            <p className="text-red-600 text-sm font-semibold">
+              <i className="fas fa-exclamation-circle mr-2"></i>{error}
+            </p>
+          </div>
+        )}
+
       </div>
-      </div>
-    </Layout>
-  );
+    </div>
+  </Layout>
+);
 };
 
 export default ScannerPage;

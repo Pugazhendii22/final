@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import CustomerForm from './CustomerForm';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-0 sm:p-4">
-    <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-    <div className="relative w-full sm:max-w-2xl sm:rounded-xl bg-white shadow-2xl z-10 flex flex-col max-h-screen sm:max-h-[90vh]">
-      <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white rounded-t-xl">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded">
+  <div className="fixed inset-0 z-50 bg-black/50 overflow-y-auto flex items-start justify-center p-4">
+    <div className="fixed inset-0" onClick={onClose} />
+    <div className="relative bg-white rounded-2xl w-full max-w-2xl mx-auto my-8 shadow-2xl">
+      <div className="flex items-center justify-between px-6 py-4 bg-[#002395] rounded-t-2xl">
+        <h3 className="text-lg font-bold text-white">{title}</h3>
+        <button onClick={onClose} className="text-white hover:text-blue-200 p-1 rounded">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <div className="overflow-y-auto flex-1 px-5 py-4">{children}</div>
+      <div className="overflow-visible flex-1 px-6 py-6">{children}</div>
     </div>
   </div>
 );
 
 const CustomerList = () => {
+  const navigate = useNavigate();
   const { userRole } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all' or 'regular'
   const [showModal, setShowModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -60,94 +62,189 @@ const CustomerList = () => {
     finally { setDeleting(false); }
   };
 
-  const filteredCustomers = customers.filter(c => {
-    if (!searchQuery) return true;
-    const q = searchQuery.replace(/\s+/g, '').toLowerCase();
-    return [c.name, c.phone].some(v => v?.replace(/\s+/g, '').toLowerCase().includes(q));
-  });
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(c => {
+      if (filterType === 'regular' && !c.isRegular) return false;
+      if (!searchQuery) return true;
+      const q = searchQuery.replace(/\s+/g, '').toLowerCase();
+      return [c.name, c.phone].some(v => v?.replace(/\s+/g, '').toLowerCase().includes(q));
+    });
+  }, [customers, filterType, searchQuery]);
+
+  const fab = (
+    <button
+      onClick={() => setShowModal(true)}
+      className="w-14 h-14 bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all"
+      style={{ borderRadius: '50%', boxShadow: '0 4px 6px -1px rgba(0, 35, 149, 0.1), 0 2px 4px -1px rgba(0, 35, 149, 0.06)' }}
+      aria-label="Add Customer"
+    >
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+    </button>
+  );
+
+  useEffect(() => {
+    if (showModal || deleteTarget) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [showModal, deleteTarget]);
 
   return (
-    <Layout title="Customers">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{customers.length} total</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm shrink-0">
-          + Add Customer
-        </button>
+  <Layout title="Customers" pageType="list" fab={fab}>
+    <div className="min-h-screen bg-[#f8fafc]">
+      
+      {/* HEADER */}
+      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-bold text-[#0f172a]">Customers</h1>
+        <span className="bg-[#002395] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+          {customers.length}
+        </span>
       </div>
+      <button
+        onClick={() => setShowModal(true)}
+        className="hidden md:flex items-center gap-2 bg-[#002395] text-white px-4 py-2 rounded-xl text-sm font-semibold"
+      >
+        <i className="fas fa-plus"></i> Add Customer
+      </button>
+    </div>
 
-      <input
-        type="text"
-        placeholder="Search by name or phone..."
-        value={searchQuery}
-        onChange={e => setSearchQuery(e.target.value)}
-        className="w-full mb-4 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-      />
+    {/* SEARCH */}
+    <div className="px-4 pt-4 pb-2">
+      <div className="relative">
+        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input
+          type="text"
+          placeholder="Search by name or phone..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] shadow-sm"
+        />
+      </div>
+    </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse" />)}</div>
-      ) : (
-        <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Name</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Phone</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Alt Phone</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">ID Type</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Badge</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase text-xs">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {filteredCustomers.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{c.name}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c.phone}</td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{c.alternatePhone || '-'}</td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{c.idType || '-'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {c.isRegular && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Regular</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link to={`/customers/${c.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View / Edit</Link>
-                    {userRole === 'admin' && (
-                      <button
-                        onClick={() => setDeleteTarget(c)}
-                        title="Delete customer"
-                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredCustomers.length === 0 && (
-                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-400 text-sm">No customers found.</td></tr>
-              )}
-            </tbody>
-          </table>
+    {/* FILTER PILLS */}
+    <div className="flex gap-2 px-4 pb-3">
+      <button
+        onClick={() => setFilterType('all')}
+        className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+          filterType === 'all' 
+            ? 'bg-[#002395] text-white' 
+            : 'bg-white border border-gray-200 text-gray-500'
+        }`}
+      >
+        All
+      </button>
+      <button
+        onClick={() => setFilterType('regular')}
+        className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+          filterType === 'regular' 
+            ? 'bg-[#ED2939] text-white' 
+            : 'bg-white border border-gray-200 text-gray-500'
+        }`}
+      >
+        Regular
+      </button>
+    </div>
+
+    {/* CUSTOMER CARDS */}
+    <div className="px-4 space-y-3">
+      {filteredCustomers.length === 0 ? (
+        <div className="text-center py-16">
+          <i className="fas fa-users text-4xl text-gray-200 mb-3 block"></i>
+          <p className="text-gray-400 text-sm">No customers found</p>
         </div>
+      ) : (
+        filteredCustomers.map(customer => (
+          <div
+            key={customer.id}
+            onClick={() => navigate(`/customers/${customer.id}`)}
+            className={`bg-white rounded-2xl border-l-4 shadow-sm p-4 cursor-pointer active:scale-95 transition ${
+              customer.isRegular ? 'border-[#ED2939]' : 'border-[#002395]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {/* Avatar */}
+              <div className="w-11 h-11 rounded-xl bg-[#002395]/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-[#002395] font-bold text-base">
+                  {customer.name?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-[#0f172a] text-sm">{customer.name}</p>
+                  {customer.isRegular && (
+                    <span className="bg-[#ED2939]/10 text-[#ED2939] text-xs px-2 py-0.5 rounded-full font-medium">
+                      Regular
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  <i className="fas fa-phone text-[#002395] mr-1"></i>
+                  {customer.phone}
+                </p>
+                {customer.idType && (
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    <i className="fas fa-id-card mr-1"></i>
+                    {customer.idType}
+                  </p>
+                )}
+              </div>
+              <i className="fas fa-chevron-right text-gray-300 flex-shrink-0"></i>
+            </div>
+          </div>
+        ))
       )}
+    </div>
 
-      {showModal && (
-        <Modal title="Add New Customer" onClose={() => setShowModal(false)}>
-          <CustomerForm onSave={handleSaveCustomer} onCancel={() => setShowModal(false)} />
-        </Modal>
-      )}
+    {/* FORM MODAL */}
+    {showModal && (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+        <div className="bg-white w-full md:max-w-2xl md:mx-auto rounded-t-3xl md:rounded-2xl flex flex-col max-h-[90vh]">
+          {/* Modal handle */}
+          <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
+            <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+          {/* Modal header - fixed */}
+          <div className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#0f172a]">
+                Add Customer
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <i className="fas fa-times text-lg"></i>
+              </button>
+            </div>
+          </div>
+          {/* Modal content - scrollable */}
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <CustomerForm
+              onSave={handleSaveCustomer}
+              onCancel={() => setShowModal(false)}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* DELETE CONFIRM MODAL */}
+    {!!deleteTarget && (
       <ConfirmDeleteModal
         isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Customer"
-        message="Deleting this customer will not delete their orders or service history. This action cannot be undone."
+        onCancel={() => setDeleteTarget(null)}
+        message="Are you sure you want to delete this customer?"
       />
-    </Layout>
-  );
+    )}
+  </div>
+  </Layout>
+);
 };
 
 export default CustomerList;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 
 const DOTS = Array.from({ length: 9 }, (_, index) => ({
   id: index + 1,
@@ -7,65 +7,102 @@ const DOTS = Array.from({ length: 9 }, (_, index) => ({
 }));
 
 const PatternLock = ({ value = [], onChange, readOnly = false }) => {
-  const [drawing, setDrawing] = useState(false);
-  const pattern = Array.isArray(value) ? value : [];
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
+  const pattern = useMemo(() => Array.isArray(value) ? value : [], [value]);
+  const patternRef = useRef(pattern);
+  const pointerIdRef = useRef(null);
+  const svgRef = useRef(null);
 
-  const addDot = (id) => {
-    if (!id || pattern.includes(id)) return;
-    const next = [...pattern, id];
-    onChange?.(next);
+  useEffect(() => {
+    patternRef.current = pattern;
+  }, [pattern]);
+
+  useEffect(() => {
+    return () => {
+      if (pointerIdRef.current) {
+        document.releasePointerCapture?.(pointerIdRef.current);
+      }
+    };
+  }, []);
+
+  const getSVGCoords = (clientX, clientY) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    
+    const rect = svg.getBoundingClientRect();
+    const scaleX = 200 / rect.width;
+    const scaleY = 200 / rect.height;
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
   };
 
-  const handlePointerDown = (id, event) => {
+  const getNearestDot = (x, y) => {
+    let nearest = null;
+    let minDist = 35; // Activation radius
+    
+    DOTS.forEach(({ id, cx, cy }) => {
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      if (dist < minDist && !patternRef.current.includes(id)) {
+        minDist = dist;
+        nearest = id;
+      }
+    });
+    
+    return nearest;
+  };
+
+  const addDotToPattern = (dotId) => {
+    if (!dotId || patternRef.current.includes(dotId)) return;
+    
+    const newPattern = [...patternRef.current, dotId];
+    patternRef.current = newPattern;
+    onChange?.(newPattern);
+  };
+
+  const handlePointerStart = (event) => {
     if (readOnly) return;
+    
     event.preventDefault();
-    setDrawing(true);
-    addDot(id);
-  };
-
-  const handlePointerEnter = (id, event) => {
-    if (readOnly || !drawing) return;
-    event.preventDefault();
-    addDot(id);
-  };
-
-  const getDotFromTouch = (touch) => {
-    if (!touch) return null;
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (!element) return null;
-    const index = element.dataset.dotIndex || element.closest('[data-dot-index]')?.dataset.dotIndex;
-    return index ? parseInt(index, 10) : null;
-  };
-
-  const handleTouchStart = (event) => {
-    if (readOnly) return;
-    const touch = event.touches[0];
-    const dotIndex = getDotFromTouch(touch);
-    if (dotIndex) {
-      event.preventDefault();
-      setDrawing(true);
-      addDot(dotIndex);
+    const coords = getSVGCoords(event.clientX, event.clientY);
+    
+    pointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    
+    setIsDrawing(true);
+    setCurrentPos(coords);
+    
+    // Check if starting on a dot
+    const startDot = getNearestDot(coords.x, coords.y);
+    if (startDot) {
+      addDotToPattern(startDot);
     }
   };
 
-  const handleTouchMove = (event) => {
-    if (readOnly || !drawing) return;
+  const handlePointerMove = (event) => {
+    if (readOnly || !isDrawing || event.pointerId !== pointerIdRef.current) return;
+    
     event.preventDefault();
-    const touch = event.touches[0];
-    const dotIndex = getDotFromTouch(touch);
-    if (dotIndex) {
-      addDot(dotIndex);
+    const coords = getSVGCoords(event.clientX, event.clientY);
+    
+    setCurrentPos(coords);
+    
+    // Check for dots along the path
+    const nearestDot = getNearestDot(coords.x, coords.y);
+    if (nearestDot) {
+      addDotToPattern(nearestDot);
     }
   };
 
-  const handleTouchEnd = () => {
-    if (readOnly) return;
-    setDrawing(false);
-  };
-
-  const stopDrawing = () => {
-    if (readOnly) return;
-    setDrawing(false);
+  const handlePointerEnd = (event) => {
+    if (readOnly || event.pointerId !== pointerIdRef.current) return;
+    
+    setIsDrawing(false);
+    setCurrentPos({ x: 0, y: 0 });
+    pointerIdRef.current = null;
   };
 
   const clearPattern = () => {
@@ -73,68 +110,126 @@ const PatternLock = ({ value = [], onChange, readOnly = false }) => {
     onChange?.([]);
   };
 
-  const points = pattern.map((id) => DOTS[id - 1]).filter(Boolean);
-  const polylinePoints = points.map((point) => `${point.cx},${point.cy}`).join(' ');
+  const points = pattern.map(id => DOTS[id - 1]).filter(Boolean);
+  
+  // Create the path: connect all dots, then extend to current position if drawing
+  const pathData = points.length > 0 ? 
+    `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}${
+      isDrawing ? ` L ${currentPos.x} ${currentPos.y}` : ''
+    }` : '';
 
   return (
     <div className="space-y-3" style={{ touchAction: 'none', userSelect: 'none' }}>
       <div
-        className="relative w-[200px] h-[200px] mx-auto"
-        style={{ touchAction: 'none' }}
-        onPointerUp={stopDrawing}
-        onPointerLeave={stopDrawing}
-        onPointerCancel={stopDrawing}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        className="relative w-full max-w-[240px] aspect-square mx-auto"
+        onPointerDown={handlePointerStart}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onPointerLeave={handlePointerEnd}
       >
-        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 200" preserveAspectRatio="none">
-          {points.length > 1 && (
-            <polyline
-              points={polylinePoints}
+        <svg 
+          ref={svgRef}
+          className="absolute inset-0 w-full h-full" 
+          viewBox="0 0 200 200" 
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Subtle background */}
+          <rect width="200" height="200" fill="#f8fafc" rx="8" />
+          
+          {/* Grid lines */}
+          <defs>
+            <pattern id="dotGrid" width="66.67" height="66.67" patternUnits="userSpaceOnUse">
+              <circle cx="33.33" cy="33.33" r="1" fill="#e2e8f0" opacity="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="200" height="200" fill="url(#dotGrid)" />
+          
+          {/* Pattern path */}
+          {pathData && (
+            <path
+              d={pathData}
               fill="none"
               stroke="#2563eb"
-              strokeWidth="10"
+              strokeWidth="6"
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity="0.7"
+              opacity="0.8"
             />
           )}
-          {points.map((point) => (
-            <circle key={`marker-${point.id}`} cx={point.cx} cy={point.cy} r="8" fill="#2563eb" />
+          
+          {/* Dot connections (thicker) */}
+          {points.length > 1 && (
+            <path
+              d={`M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`}
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.9"
+            />
+          )}
+          
+          {/* Active dots */}
+          {points.map((point, index) => (
+            <circle 
+              key={`active-${point.id}`} 
+              cx={point.cx} 
+              cy={point.cy} 
+              r="14" 
+              fill="#2563eb" 
+              opacity="0.9"
+            />
           ))}
+          
+          {/* Current position indicator */}
+          {isDrawing && (
+            <circle 
+              cx={currentPos.x} 
+              cy={currentPos.y} 
+              r="10" 
+              fill="#2563eb" 
+              opacity="0.6"
+            />
+          )}
         </svg>
 
-        <div className="grid grid-cols-3 gap-0 w-full h-full">
-          {DOTS.map(({ id }) => {
-            const selected = pattern.includes(id);
+        <div className="grid grid-cols-3 gap-0 w-full h-full absolute inset-0">
+          {DOTS.map(({ id }, index) => {
+            const isSelected = pattern.includes(id);
+            const isCurrent = isDrawing && getNearestDot(currentPos.x, currentPos.y) === id;
+            
             return (
-              <button
-                type="button"
+              <div
                 key={id}
-                data-dot-index={id}
-                onPointerDown={(event) => handlePointerDown(id, event)}
-                onPointerEnter={(event) => handlePointerEnter(id, event)}
                 className="relative w-full h-full flex items-center justify-center"
-                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <span
-                  data-dot-index={id}
-                  className={`block w-5 h-5 rounded-full border ${
-                    selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
-                  } transition`}
+                <div
+                  className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
+                    isSelected 
+                      ? 'bg-blue-600 border-blue-600 scale-125 shadow-lg' 
+                      : isCurrent
+                        ? 'bg-blue-300 border-blue-400 scale-110 shadow-md'
+                        : 'bg-white border-gray-300 hover:border-blue-400'
+                  }`}
                 />
-              </button>
+              </div>
             );
           })}
         </div>
       </div>
+      
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          {pattern.length > 0 ? `Pattern: ${pattern.join(' → ')}` : 'Pattern: not set'}
+          {pattern.length > 0 ? `Pattern: ${pattern.join(' → ')}` : 'Draw your pattern'}
         </p>
         {!readOnly && (
-          <button type="button" onClick={clearPattern} className="text-sm text-slate-700 hover:text-slate-900">
+          <button 
+            type="button" 
+            onClick={clearPattern} 
+            className="text-sm text-slate-600 hover:text-slate-800 underline"
+          >
             Clear
           </button>
         )}

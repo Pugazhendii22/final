@@ -35,20 +35,20 @@ const TaskManagement = () => {
     setLoading(true);
     try {
       await checkAndResetTasks();
-      
+
       const tasksRef = collection(db, 'tasks');
       const q = query(tasksRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const tasksList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setTasks(tasksList);
-      
+
       const usersRef = collection(db, 'users');
       const usersSnap = await getDocs(usersRef);
       const staffList = usersSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => u.role === 'staff' && u.isActive !== false);
       setStaff(staffList);
-      
+
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -59,7 +59,7 @@ const TaskManagement = () => {
   const calculateResetDate = (dueDateStr, frequency) => {
     const dueDate = new Date(dueDateStr);
     if (frequency === 'one-time') return dueDate;
-    
+
     const d = new Date(dueDate);
     if (frequency === 'daily') {
       d.setDate(d.getDate() + 1);
@@ -127,7 +127,7 @@ const TaskManagement = () => {
     if (task) {
       setEditingTask(task);
       const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-      const localISOTime = (new Date(task.dueDate.toDate() - tzOffset)).toISOString().slice(0,16);
+      const localISOTime = (new Date(task.dueDate.toDate() - tzOffset)).toISOString().slice(0, 16);
       setFormData({
         title: task.title,
         description: task.description || '',
@@ -163,187 +163,180 @@ const TaskManagement = () => {
     return 'bg-green-100 text-green-800 border-green-200';
   };
 
+
+  useEffect(() => {
+    if (isModalOpen || deleteTarget) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [isModalOpen, deleteTarget]);
   return (
-    <Layout title="Task Management">
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Task Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage staff tasks and routines.</p>
-        </div>
-        <button 
-          onClick={() => openModal()}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
-          Add New Task
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex overflow-x-auto pb-2 md:pb-0 hide-scrollbar w-full md:w-auto gap-2">
-            {['All Tasks', 'Daily', 'Weekly', 'Monthly', 'One-time'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setFilterTab(tab)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${filterTab === tab ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
-              >
-                {tab}
-              </button>
-            ))}
+    <Layout title="Task Management" pageType="list">
+      <div className="flex-1 min-w-0">
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0f172a]">Task Management</h1>
+            <p className="text-sm text-[#64748b] mt-1">Manage staff tasks and routines.</p>
           </div>
-          <div className="flex gap-4 w-full md:w-auto">
-            <select
-              value={filterStaff}
-              onChange={(e) => setFilterStaff(e.target.value)}
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5"
-            >
-              <option value="All">All Staff</option>
-              {staff.map(s => (
-                <option key={s.id} value={s.id}>{s.name || s.email}</option>
+          <button
+            onClick={() => openModal()}
+            className="bg-[#002395] hover:bg-[#001a7a] text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 break-words"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            Add New Task
+          </button>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#e2e8f0] mb-6 break-words">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex overflow-x-auto pb-2 md:pb-0 hide-scrollbar w-full md:w-auto gap-2">
+              {['All Tasks', 'Daily', 'Weekly', 'Monthly', 'One-time'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setFilterTab(tab)}
+                  className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-colors ${filterTab === tab ? 'bg-[#002395] text-white' : 'text-[#64748b] hover:bg-blue-50'}`}
+                >
+                  {tab}
+                </button>
               ))}
-            </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5"
-            >
-              <option value="All">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Completed">Completed</option>
-            </select>
+            </div>
+            <div className="flex gap-4 w-full md:w-auto">
+              <select
+                value={filterStaff}
+                onChange={(e) => setFilterStaff(e.target.value)}
+                className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-xl block w-full p-2.5 outline-none transition-colors font-medium break-words"
+              >
+                <option value="All">All Staff</option>
+                {staff.map(s => (
+                  <option key={s.id} value={s.id}>{s.name || s.email}</option>
+                ))}
+              </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-xl block w-full p-2.5 outline-none transition-colors font-medium break-words"
+              >
+                <option value="All">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Tasks Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading tasks...</div>
-        ) : filteredTasks.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No tasks found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-500">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
-                <tr>
-                  <th scope="col" className="px-6 py-3">Task Title</th>
-                  <th scope="col" className="px-6 py-3">Assigned To</th>
-                  <th scope="col" className="px-6 py-3">Frequency</th>
-                  <th scope="col" className="px-6 py-3">Priority</th>
-                  <th scope="col" className="px-6 py-3">Due Date</th>
-                  <th scope="col" className="px-6 py-3">Status</th>
-                  <th scope="col" className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTasks.map(task => (
-                  <tr key={task.id} className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {task.title}
-                      {task.description && <p className="text-xs text-gray-500 font-normal mt-1 truncate max-w-[200px]">{task.description}</p>}
-                    </td>
-                    <td className="px-6 py-4">{task.assignedToName}</td>
-                    <td className="px-6 py-4 capitalize">{task.frequency}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded border text-xs font-medium capitalize ${getPriorityColor(task.priority)}`}>
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e2e8f0] overflow-hidden break-words">
+          {loading ? (
+            <div className="p-8 text-center text-[#64748b] font-medium">Loading tasks...</div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="p-8 text-center text-[#64748b] font-medium">No tasks found.</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {filteredTasks.map(task => (
+                <div key={task.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50 transition-colors break-words">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#0f172a] text-sm truncate">{task.title}</p>
+                    {task.description && <p className="text-xs text-[#64748b] mt-1 truncate">{task.description}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-[#64748b] md:grid-cols-4 md:gap-4 md:text-right">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[#002395]">Assigned</div>
+                      <div className="text-[#0f172a] font-medium">{task.assignedToName}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[#002395]">Frequency</div>
+                      <div className="capitalize text-[#0f172a] font-medium">{task.frequency}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[#002395]">Due</div>
+                      <div className="text-[#0f172a] font-medium">{task.dueDate?.toDate().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <div>
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold uppercase border ${getPriorityColor(task.priority)}`}>
                         {task.priority}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {task.dueDate?.toDate().toLocaleString(undefined, {
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                      })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                        task.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {task.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => openModal(task)} className="font-medium text-indigo-600 hover:underline">Edit</button>
-                      <button onClick={() => setDeleteTarget(task)} className="font-medium text-red-600 hover:underline">Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-3 md:mt-0 md:justify-end">
+                    <button onClick={() => openModal(task)} className="text-[#002395] hover:bg-blue-50 px-3 py-2 rounded-2xl text-xs font-semibold transition-colors">Edit</button>
+                    <button onClick={() => setDeleteTarget(task)} className="text-[#ED2939] hover:bg-red-50 px-3 py-2 rounded-2xl text-xs font-semibold transition-colors">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/50 overflow-y-auto flex items-start justify-center p-4">
+            <div className="relative bg-white rounded-2xl w-full max-w-md mx-auto my-8 shadow-2xl border border-[#e2e8f0]">
+              <div className="flex items-center justify-between px-6 py-4 bg-[#002395] rounded-t-2xl">
+                <h3 className="text-lg font-bold text-white">{editingTask ? 'Edit Task' : 'Add New Task'}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-white hover:text-blue-200 p-1 rounded transition">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-6 overflow-visible flex-1">
+                <form id="taskForm" onSubmit={handleSave} className="space-y-4">
+                  <div>
+                    <label className="block mb-1 text-sm font-bold text-[#0f172a]">Title <span className="text-[#ED2939]">*</span></label>
+                    <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-lg block w-full p-2.5 outline-none transition-colors font-medium break-words" />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-bold text-[#0f172a]">Description</label>
+                    <textarea rows="3" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-lg block w-full p-2.5 outline-none transition-colors font-medium break-words"></textarea>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-bold text-[#0f172a]">Assign To <span className="text-[#ED2939]">*</span></label>
+                    <select required value={formData.assignedTo} onChange={e => setFormData({ ...formData, assignedTo: e.target.value })} className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-lg block w-full p-2.5 outline-none transition-colors font-medium break-words">
+                      <option value="">Select Staff</option>
+                      {staff.map(s => (
+                        <option key={s.id} value={s.id}>{s.name || s.email}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block mb-1 text-sm font-bold text-[#0f172a]">Frequency <span className="text-[#ED2939]">*</span></label>
+                      <select required value={formData.frequency} onChange={e => setFormData({ ...formData, frequency: e.target.value })} className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-lg block w-full p-2.5 outline-none transition-colors font-medium break-words">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="one-time">One-time</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-sm font-bold text-[#0f172a]">Priority <span className="text-[#ED2939]">*</span></label>
+                      <select required value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-lg block w-full p-2.5 outline-none transition-colors font-medium break-words">
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-bold text-[#0f172a]">Due Date & Time <span className="text-[#ED2939]">*</span></label>
+                    <input type="datetime-local" required value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} className="border-2 border-[#e2e8f0] focus:border-[#002395] text-[#0f172a] text-sm rounded-lg block w-full p-2.5 outline-none transition-colors font-medium break-words" />
+                  </div>
+                </form>
+              </div>
+              <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-3 rounded-b-2xl break-words">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="bg-white border-2 border-[#e2e8f0] text-[#64748b] rounded-xl px-6 py-2.5 font-bold hover:bg-gray-50 transition break-words">Cancel</button>
+                <button type="submit" form="taskForm" className="bg-[#002395] text-white rounded-xl px-6 py-2.5 font-bold hover:bg-[#001a7a] transition break-words">Save Task</button>
+              </div>
+            </div>
           </div>
         )}
+        <ConfirmDeleteModal
+          isOpen={!!deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          deleting={deleting}
+          title="Delete Task"
+          message="Are you sure you want to delete this task? This action cannot be undone."
+        />
       </div>
-
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-bold text-gray-900">{editingTask ? 'Edit Task' : 'Add New Task'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              <form id="taskForm" onSubmit={handleSave} className="space-y-4">
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-gray-900">Title <span className="text-red-500">*</span></label>
-                  <input type="text" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5" />
-                </div>
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-gray-900">Description</label>
-                  <textarea rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5"></textarea>
-                </div>
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-gray-900">Assign To <span className="text-red-500">*</span></label>
-                  <select required value={formData.assignedTo} onChange={e => setFormData({...formData, assignedTo: e.target.value})} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
-                    <option value="">Select Staff</option>
-                    {staff.map(s => (
-                      <option key={s.id} value={s.id}>{s.name || s.email}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-900">Frequency <span className="text-red-500">*</span></label>
-                    <select required value={formData.frequency} onChange={e => setFormData({...formData, frequency: e.target.value})} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="one-time">One-time</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-900">Priority <span className="text-red-500">*</span></label>
-                    <select required value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-gray-900">Due Date & Time <span className="text-red-500">*</span></label>
-                  <input type="datetime-local" required value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5" />
-                </div>
-              </form>
-            </div>
-            <div className="p-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-xl">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-              <button type="submit" form="taskForm" className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Save Task</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Task"
-        message="Are you sure you want to delete this task? This action cannot be undone."
-      />
     </Layout>
   );
 };

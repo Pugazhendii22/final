@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import EnquiryForm from './EnquiryForm';
 import { useAuth } from '../../context/AuthContext';
-import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const EnquiryList = () => {
   const { userRole } = useAuth();
@@ -60,110 +59,175 @@ const EnquiryList = () => {
 
   const statusColor = (s) => ({ Open: 'bg-blue-100 text-blue-800', 'Follow-up': 'bg-yellow-100 text-yellow-800', Converted: 'bg-green-100 text-green-800', Closed: 'bg-gray-100 text-gray-800' }[s] || 'bg-gray-100 text-gray-800');
 
-  return (
-    <Layout title="Enquiries">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Enquiry Tracking</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{enquiries.length} total</p>
+  const fab = (
+    <button
+      onClick={() => setShowModal(true)}
+      className="w-14 h-14 bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all"
+      style={{ borderRadius: '50%', boxShadow: '0 4px 6px -1px rgba(0, 35, 149, 0.1), 0 2px 4px -1px rgba(0, 35, 149, 0.06)' }}
+      aria-label="New Enquiry"
+    >
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+    </button>
+  );
+
+return (
+  <Layout title="Enquiries" fab={fab}>
+    <div className="bg-[#f8fafc]">
+      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-bold text-[#0f172a]">Enquiries</h1>
+          <span className="bg-[#002395] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+            {enquiries.length}
+          </span>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm shrink-0">+ New Enquiry</button>
+        <button
+          onClick={() => setShowModal(true)}
+          className="hidden md:flex items-center gap-2 bg-[#002395] text-white px-4 py-2 rounded-xl text-sm font-semibold"
+        >
+          <i className="fas fa-plus"></i> New Enquiry
+        </button>
       </div>
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <input type="text" placeholder="Search name, phone, model..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm" />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm">
-          <option value="">All Statuses</option>
+    {/* SEARCH AND FILTERS */}
+    <div className="px-4 pt-3 pb-2 space-y-2">
+      <div className="relative">
+        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input
+          type="text"
+          placeholder="Search by name, phone, model..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] shadow-sm"
+        />
+      </div>
+      <div className="flex gap-2">
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+        >
+          <option value="">All Status</option>
           <option value="Open">Open</option>
           <option value="Follow-up">Follow-up</option>
           <option value="Converted">Converted</option>
           <option value="Closed">Closed</option>
         </select>
-        <select value={seriousnessFilter} onChange={e => setSeriousnessFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm">
-          <option value="">All Seriousness</option>
+        <select
+          value={seriousnessFilter}
+          onChange={e => setSeriousnessFilter(e.target.value)}
+          className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+        >
+          <option value="">All Priority</option>
           <option value="Urgent">Urgent</option>
           <option value="Ordinary">Ordinary</option>
         </select>
-        <button onClick={() => { setSearchQuery(''); setStatusFilter(''); setSeriousnessFilter(''); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 shrink-0">Clear</button>
       </div>
+    </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-lg h-14 animate-pulse" />)}</div>
-      ) : (
-        <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Customer</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Model</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Budget</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs hidden md:table-cell">Details</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase text-xs">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {filteredEnquiries.map(e => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{e.customerName}</div>
-                    <div className="text-xs text-gray-400">{e.customerPhone}</div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{e.modelEnquired}</td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">₹{e.budgetMin} - ₹{e.budgetMax}</td>
-                  <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
-                    <span className={e.seriousness === 'Urgent' ? 'text-red-600 font-bold text-xs' : 'text-xs'}>{e.seriousness}</span>
-                    <span className="text-xs text-gray-400"> | {e.requiredWithin}</span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(e.status)}`}>{e.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link to={`/enquiries/${e.id}`} className="text-indigo-600 hover:text-indigo-900 font-medium text-xs">View</Link>
-                    {userRole === 'admin' && (
-                      <button
-                        onClick={() => setDeleteTarget(e)}
-                        title="Delete enquiry"
-                        className="ml-3 text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredEnquiries.length === 0 && (
-                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-400">No enquiries found.</td></tr>
-              )}
-            </tbody>
-          </table>
+    {/* ENQUIRY CARDS */}
+    <div className="px-4 space-y-3">
+      {filteredEnquiries.length === 0 ? (
+        <div className="text-center py-16">
+          <i className="fas fa-question-circle text-4xl text-gray-200 mb-3 block"></i>
+          <p className="text-gray-400 text-sm">No enquiries found</p>
         </div>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-0 sm:p-4">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setShowModal(false)} />
-          <div className="relative w-full sm:max-w-2xl sm:rounded-xl bg-white shadow-2xl z-10 flex flex-col max-h-screen sm:max-h-[90vh]">
-            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white sm:rounded-t-xl">
-              <h3 className="text-lg font-semibold">Add New Enquiry</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 p-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-5 py-4">
-              <EnquiryForm onSave={handleSaveEnquiry} onCancel={() => setShowModal(false)} />
+      ) : (
+        filteredEnquiries.map(enquiry => (
+          <Link to={`/enquiries/${enquiry.id}`} className="block">
+          <div
+            className={`bg-white rounded-2xl border-l-4 shadow-sm p-4 cursor-pointer active:scale-95 transition ${
+              enquiry.seriousness === 'Urgent' ? 'border-[#ED2939]' : 'border-[#002395]'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-[#0f172a] text-sm">{enquiry.customerName}</p>
+                  {enquiry.seriousness === 'Urgent' && (
+                    <span className="bg-[#ED2939]/10 text-[#ED2939] text-xs px-2 py-0.5 rounded-full font-medium">
+                      Urgent
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  <i className="fas fa-phone text-green-500 mr-1"></i>
+                  {enquiry.customerPhone}
+                </p>
+                {enquiry.modelEnquired && (
+                  <p className="text-[#002395] text-xs mt-1 font-medium">
+                    <i className="fas fa-mobile-alt mr-1"></i>
+                    {enquiry.modelEnquired}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {enquiry.budgetMin && (
+                    <span className="text-xs text-gray-400">
+                      ₹{enquiry.budgetMin}
+                      {enquiry.budgetMax && ` - ₹${enquiry.budgetMax}`}
+                    </span>
+                  )}
+                  {enquiry.medium && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      enquiry.medium === 'Walk-in' ? 'bg-[#002395]/10 text-[#002395]' :
+                      enquiry.medium === 'Instagram' ? 'bg-pink-100 text-pink-700' :
+                      enquiry.medium === 'YouTube' ? 'bg-red-100 text-[#ED2939]' :
+                      enquiry.medium === 'Referral' ? 'bg-green-100 text-green-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {enquiry.medium}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  enquiry.status === 'Open' ? 'bg-[#002395]/10 text-[#002395]' :
+                  enquiry.status === 'Follow-up' ? 'bg-orange-100 text-orange-700' :
+                  enquiry.status === 'Converted' ? 'bg-green-100 text-green-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>
+                  {enquiry.status}
+                </span>
+                <i className="fas fa-chevron-right text-gray-300 text-xs"></i>
+              </div>
             </div>
           </div>
-        </div>
+          </Link>
+        ))
       )}
-      <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        deleting={deleting}
-        title="Delete Enquiry"
-        message="Are you sure you want to delete this enquiry? This action cannot be undone."
-      />
-    </Layout>
-  );
+    </div>
+
+    {/* ADD ENQUIRY MODAL */}
+    {showModal && (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+        <div className="bg-white w-full md:max-w-2xl md:mx-auto rounded-t-3xl md:rounded-2xl flex flex-col max-h-[90vh]">
+          <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
+            <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+          <div className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-gray-100 bg-white">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#0f172a]">
+                New Enquiry
+              </h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 p-1">
+                <i className="fas fa-times text-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <EnquiryForm
+              initialData={null}
+              onSave={handleSaveEnquiry}
+              onCancel={() => setShowModal(false)}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+
+    </div>
+  </Layout>
+);
 };
 
 export default EnquiryList;

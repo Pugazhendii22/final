@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { uploadImageToCloudinary } from '../../utils/uploadImage';
 
 const CustomerForm = ({ initialData, onSave, onCancel }) => {
   const [formData, setFormData] = useState(initialData || {
@@ -19,12 +20,14 @@ const CustomerForm = ({ initialData, onSave, onCancel }) => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingId, setUploadingId] = useState(false);
   const [error, setError] = useState('');
+  const [photoUrl, setPhotoUrl] = useState(initialData?.photoUrl || '');
+  const [idProofUrl, setIdProofUrl] = useState(initialData?.idProofUrl || '');
 
   const handleUpload = async (file, type) => {
     if (!file) return;
     const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-    
+
     if (!cloudName || !uploadPreset || cloudName.includes('paste_')) {
       setError("Cloudinary configuration missing in .env");
       return;
@@ -57,6 +60,38 @@ const CustomerForm = ({ initialData, onSave, onCancel }) => {
     }
   };
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploadingPhoto(true);
+      const url = await uploadImageToCloudinary(file);
+      setPhotoUrl(url);
+      setFormData(prev => ({ ...prev, photoUrl: url }));
+    } catch (error) {
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleIdProofUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploadingId(true);
+      const url = await uploadImageToCloudinary(file);
+      setIdProofUrl(url);
+      setFormData(prev => ({ ...prev, idProofUrl: url }));
+    } catch (error) {
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploadingId(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -69,93 +104,306 @@ const CustomerForm = ({ initialData, onSave, onCancel }) => {
     }
   };
 
+  const inputClass = "mt-1 block w-full border-2 border-[#e2e8f0] focus:border-[#002395] focus:ring-1 focus:ring-[#002395] rounded-lg p-2.5 outline-none transition-colors text-sm font-medium text-[#0f172a]";
+  const labelClass = "block text-sm font-bold text-[#0f172a]";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="text-red-600 bg-red-100 p-3 rounded">{error}</div>}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <form onSubmit={handleSubmit} className="space-y-5 pb-4">
+
+    {error && (
+      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+        {error}
+      </div>
+    )}
+
+    {/* PERSONAL DETAILS */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        Personal Details
+      </p>
+      <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Name *</label>
-          <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Name <span className="text-[#ED2939]">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.name}
+            onChange={e => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Enter customer name"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone <span className="text-[#ED2939]">*</span>
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              pattern="[0-9]*"
+              required
+              value={formData.phone}
+              onChange={e => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="WhatsApp number"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Alternate Number
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              pattern="[0-9]*"
+              value={formData.alternatePhone}
+              onChange={e => setFormData({ ...formData, alternatePhone: e.target.value })}
+              placeholder="Optional"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+            />
+          </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Phone (WhatsApp) *</label>
-          <input type="text" required value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={e => setFormData({ ...formData, email: e.target.value })}
+            placeholder="Optional"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Alternate Phone</label>
-          <input type="text" value={formData.alternatePhone} onChange={e => setFormData({...formData, alternatePhone: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <textarea
+            value={formData.address}
+            onChange={e => setFormData({ ...formData, address: e.target.value })}
+            placeholder="Optional"
+            rows={2}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
+      </div>
+    </div>
+
+    {/* ID DETAILS */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        ID Details
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Email</label>
-          <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Address</label>
-          <textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows="2"></textarea>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">ID Type</label>
-          <select value={formData.idType} onChange={e => setFormData({...formData, idType: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-            <option value="">Select ID</option>
+          <label className="block text-sm font-medium text-gray-700 mb-1">ID Type</label>
+          <select
+            value={formData.idType}
+            onChange={e => setFormData({ ...formData, idType: e.target.value })}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+          >
+            <option value="">Select ID Type</option>
             <option value="Aadhaar">Aadhaar</option>
             <option value="PAN">PAN</option>
             <option value="Driving Licence">Driving Licence</option>
             <option value="Working ID">Working ID</option>
             <option value="Student ID">Student ID</option>
-            <option value="Additional Proof">Additional Proof</option>
             <option value="Others">Others</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">ID Number</label>
-          <input type="text" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Customer Photo</label>
-          <input type="file" accept="image/*" onChange={e => handleUpload(e.target.files[0], 'photo')} className="mt-1 block w-full text-sm" />
-          {uploadingPhoto && <span className="text-sm text-blue-600">Uploading...</span>}
-          {formData.photoUrl && <img src={formData.photoUrl} alt="Customer" className="mt-2 h-20 w-20 object-cover rounded" />}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">ID Proof Photo</label>
-          <input type="file" accept="image/*" onChange={e => handleUpload(e.target.files[0], 'id')} className="mt-1 block w-full text-sm" />
-          {uploadingId && <span className="text-sm text-blue-600">Uploading...</span>}
-          {formData.idProofUrl && <img src={formData.idProofUrl} alt="ID" className="mt-2 h-20 w-20 object-cover rounded" />}
-        </div>
-
-        <div className="md:col-span-2 flex items-center space-x-2">
-          <input type="checkbox" id="isRegular" checked={formData.isRegular} onChange={e => setFormData({...formData, isRegular: e.target.checked})} className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" />
-          <label htmlFor="isRegular" className="text-sm font-medium text-gray-700">Regular Customer</label>
-        </div>
-
-        {formData.isRegular && (
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Relationship</label>
-            <select value={formData.relationship} onChange={e => setFormData({...formData, relationship: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
-              <option value="">Select Relationship</option>
-              <option value="Family">Family</option>
-              <option value="Close Friend">Close Friend</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-        )}
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Notes</label>
-          <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows="3"></textarea>
+          <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={formData.idNumber}
+            onChange={e => setFormData({ ...formData, idNumber: e.target.value })}
+            placeholder="Optional"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+          />
         </div>
       </div>
+    </div>
 
-      <div className="flex justify-end space-x-3 pt-4 border-t">
-        <button type="button" onClick={onCancel} className="px-4 py-2 border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={loading || uploadingPhoto || uploadingId} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
-          {loading ? 'Saving...' : 'Save'}
+    {/* PHOTOS */}
+    <div>
+      <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+        Photos
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        
+        {/* Customer Photo */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Customer Photo
+          </label>
+          {uploadingPhoto ? (
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl h-28">
+              <i className="fas fa-spinner fa-spin text-2xl text-[#002395] mb-1"></i>
+              <span className="text-xs text-gray-400">Uploading...</span>
+            </div>
+          ) : photoUrl ? (
+            <div className="relative">
+              <img
+                src={photoUrl}
+                alt="Customer"
+                className="w-full h-28 object-cover rounded-xl border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoUrl('');
+                  setFormData(prev => ({ ...prev, photoUrl: '' }));
+                }}
+                className="absolute top-1 right-1 bg-[#ED2939] text-white w-6 h-6 rounded-full flex items-center justify-center"
+              >
+                <i className="fas fa-times text-xs"></i>
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2 mt-1">
+              <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#002395]/30 bg-[#002395]/5 rounded-xl h-16 cursor-pointer active:scale-95 transition">
+                <i className="fas fa-camera text-[#002395] text-lg mb-0.5"></i>
+                <span className="text-xs text-[#002395] font-medium">Camera</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+              </label>
+              <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl h-16 cursor-pointer active:scale-95 transition">
+                <i className="fas fa-images text-gray-500 text-lg mb-0.5"></i>
+                <span className="text-xs text-gray-500 font-medium">Gallery</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* ID Proof Photo */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            ID Proof Photo
+          </label>
+          {uploadingId ? (
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl h-28">
+              <i className="fas fa-spinner fa-spin text-2xl text-[#002395] mb-1"></i>
+              <span className="text-xs text-gray-400">Uploading...</span>
+            </div>
+          ) : idProofUrl ? (
+            <div className="relative">
+              <img
+                src={idProofUrl}
+                alt="ID Proof"
+                className="w-full h-28 object-cover rounded-xl border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setIdProofUrl('');
+                  setFormData(prev => ({ ...prev, idProofUrl: '' }));
+                }}
+                className="absolute top-1 right-1 bg-[#ED2939] text-white w-6 h-6 rounded-full flex items-center justify-center"
+              >
+                <i className="fas fa-times text-xs"></i>
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2 mt-1">
+              <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#002395]/30 bg-[#002395]/5 rounded-xl h-16 cursor-pointer active:scale-95 transition">
+                <i className="fas fa-camera text-[#002395] text-lg mb-0.5"></i>
+                <span className="text-xs text-[#002395] font-medium">Camera</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleIdProofUpload}
+                  className="hidden"
+                />
+              </label>
+              <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl h-16 cursor-pointer active:scale-95 transition">
+                <i className="fas fa-images text-gray-500 text-lg mb-0.5"></i>
+                <span className="text-xs text-gray-500 font-medium">Gallery</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleIdProofUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+
+    {/* REGULAR CUSTOMER */}
+    <div className="bg-[#f8fafc] rounded-xl p-4 border border-gray-100">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#0f172a]">Regular Customer</p>
+          <p className="text-xs text-gray-400">Gets special discounts</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setFormData({ ...formData, isRegular: !formData.isRegular })}
+          className={`w-11 h-6 rounded-full transition-all duration-200 relative flex-shrink-0 focus:outline-none ${
+            formData.isRegular ? 'bg-[#002395]' : 'bg-gray-300'
+          }`}
+        >
+          <div
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-200 transform ${
+              formData.isRegular ? 'translate-x-5' : 'translate-x-0'
+            }`}
+          />
         </button>
       </div>
-    </form>
-  );
+      {formData.isRegular && (
+        <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
+          <select
+            value={formData.relationship}
+            onChange={e => setFormData({ ...formData, relationship: e.target.value })}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+          >
+            <option value="">Select</option>
+            <option value="Family">Family</option>
+            <option value="Close Friend">Close Friend</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      )}
+    </div>
+
+    {/* SUBMIT BUTTONS */}
+    <div className="flex gap-3 pt-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-semibold"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={loading}
+        className="flex-1 bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+      >
+        {loading ? 'Saving...' : initialData ? 'Save Changes' : 'Add Customer'}
+      </button>
+    </div>
+
+  </form>
+);
 };
 
 export default CustomerForm;
