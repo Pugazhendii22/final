@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Lazy load components
 const Login = lazy(() => import('./pages/Login'));
@@ -55,13 +56,14 @@ function App() {
     <AuthProvider>
       <SettingsProvider>
         <Router>
-          <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/setup" element={<AdminSetup />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/rate/:token" element={<RatingPage />} />
-            <Route path="/scan/:labelNumber" element={<ScanResult />} />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/setup" element={<AdminSetup />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/rate/:token" element={<RatingPage />} />
+                <Route path="/scan/:labelNumber" element={<ScanResult />} />
+                <Route path="/" element={<Navigate to="/login" replace />} />
             <Route 
               path="/dashboard" 
               element={
@@ -233,6 +235,7 @@ function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Suspense>
+      </ErrorBoundary>
       </Router>
       <PWAInstallPrompt />
       </SettingsProvider>

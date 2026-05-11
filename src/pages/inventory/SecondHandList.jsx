@@ -1,26 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import SecondHandForm from './SecondHandForm';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
-
-const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 bg-black/50 overflow-y-auto flex items-start justify-center p-4">
-    <div className="fixed inset-0" onClick={onClose} />
-    <div className="relative bg-white rounded-2xl w-full max-w-4xl mx-auto my-8 shadow-sm border border-[#e2e8f0]">
-      <div className="flex items-center justify-between px-6 py-4 bg-[#002395] rounded-t-2xl border-b">
-        <h3 className="text-lg font-bold text-white tracking-wide">{title}</h3>
-        <button onClick={onClose} className="text-white hover:text-blue-200 p-1 rounded transition">
-          <i className="fas fa-times text-xl"></i>
-        </button>
-      </div>
-      <div className="overflow-visible flex-1 px-6 py-6 bg-[#f8fafc] rounded-b-2xl">{children}</div>
-    </div>
-  </div>
-);
 
 const SecondHandList = () => {
   const { userRole } = useAuth();
@@ -51,12 +36,14 @@ const SecondHandList = () => {
     const newMobile = { ...data, updatedAt: new Date().toISOString() };
     if (data.id) {
       const { id, ...updateData } = newMobile;
-      await import('firebase/firestore').then(m => m.updateDoc(m.doc(db, 'second_hand_mobiles', id), updateData));
-      fetchMobiles(); return id;
+      await updateDoc(doc(db, 'second_hand_mobiles', id), updateData);
+      fetchMobiles();
+      return id;
     }
     newMobile.createdAt = new Date().toISOString();
     const docRef = await addDoc(collection(db, 'second_hand_mobiles'), newMobile);
-    fetchMobiles(); return docRef.id;
+    fetchMobiles();
+    return docRef.id;
   };
 
   const handleDeleteClick = (m) => {
