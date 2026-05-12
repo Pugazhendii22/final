@@ -31,6 +31,7 @@ const ScannerPage = lazy(() => import('./pages/scan/ScannerPage'));
 const RatingPage = lazy(() => import('./pages/rating/RatingPage'));
 const RatingsList = lazy(() => import('./pages/admin/RatingsList'));
 const SettingsPage = lazy(() => import('./pages/admin/SettingsPage'));
+const DuePaymentsPage = lazy(() => import('./pages/payments/DuePaymentsPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
@@ -229,6 +230,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <MyTasks />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/due-payments" 
+              element={
+                <ProtectedRoute>
+                  <DuePaymentsPage />
                 </ProtectedRoute>
               } 
             />

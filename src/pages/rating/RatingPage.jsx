@@ -114,6 +114,16 @@ const RatingPage = () => {
             </div>
           </div>
 
+          {/* WALLET BALANCE */}
+          {ratingDoc.walletBalance > 0 && (
+            <div className="bg-[#002395]/5 rounded-xl p-3 text-center">
+              <i className="fas fa-wallet text-[#002395] mr-2"></i>
+              <span className="text-sm font-semibold text-[#002395]">
+                Your wallet balance: ₹{ratingDoc.walletBalance}
+              </span>
+            </div>
+          )}
+
           {/* STAR RATING */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <p className="text-center font-semibold text-[#0f172a] mb-4">

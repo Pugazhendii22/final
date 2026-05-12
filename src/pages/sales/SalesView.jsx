@@ -180,6 +180,22 @@ return (
               <span className="font-medium text-green-600">- ₹{sale?.discount}</span>
             </div>
           )}
+          {sale?.discountCategory && sale?.discountCategory !== 'manual' && (
+            <p className="text-xs text-green-600 mt-1">
+              <i className="fas fa-tag mr-1"></i>
+              {sale.discountCategory === 'family' ? 'Family Discount' :
+               sale.discountCategory === 'friends' ? 'Friends Discount' :
+               'Regular Customer Discount'}
+            </p>
+          )}
+          {sale?.walletUsed > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-[#002395]">
+                <i className="fas fa-wallet mr-1"></i>Wallet Used
+              </span>
+              <span className="font-medium text-[#002395]">- ₹{sale?.walletUsed}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base font-bold border-t border-gray-100 pt-2 mt-2">
             <span>Total</span>
             <span className="text-[#002395]">₹{sale?.totalAmount}</span>

@@ -20,39 +20,34 @@ const generateSerialNumber = () => {
 
 const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const { currentUser } = useAuth();
-  const defaultChecklist = {
-    frontCamera: "Working", rearCamera: "Working", earpieceSpeaker: "Working",
-    simSlot1: "Working", simSlot2: "Working", microphone: "Working", loudspeaker: "Working",
-    proximitySensor: "Working", powerButton: "Working", volumeButtons: "Working",
-    mobileData: "Working", bluetooth: "Working", wifi: "Working", flashlight: "Working",
-    displayReplaced: "No", whiteSpots: "No", physicalDamage: "No"
-  };
+  const { deviceChecklist } = useSettings();
+
+  const initializeChecklist = () => {
+    const checklist = {}
+    deviceChecklist.forEach(category => {
+      category.items.forEach(item => {
+        const key = item.label.replace(/\s+/g, '_').toLowerCase()
+        checklist[key] = item.type === 'yes_no' ? 'No' : 'Working'
+      })
+    })
+    return checklist
+  }
+
+  const defaultChecklist = initializeChecklist();
 
   const calculateGrade = (checklist) => {
-    if (checklist.physicalDamage === 'Yes' ||
-      (checklist.simSlot1 === 'Not Working' && checklist.simSlot2 === 'Not Working') ||
-      (checklist.earpieceSpeaker === 'Not Working' && checklist.loudspeaker === 'Not Working' && checklist.microphone === 'Not Working')) {
-      return 'D';
-    }
+    if (!checklist) return 'A'
 
-    const notWorkingItems = Object.keys(checklist).filter(k => checklist[k] === 'Not Working');
+    const values = Object.values(checklist)
+    const notWorkingCount = values.filter(v => v === 'Not Working').length
+    const hasPhysicalDamage = checklist['physical_damage_/_bent'] === 'Yes'
+    const hasDisplayReplaced = checklist['display_replaced'] === 'Yes'
+    const hasWhiteSpots = checklist['white_spots_on_display'] === 'Yes'
 
-    if (checklist.displayReplaced === 'Yes' || checklist.whiteSpots === 'Yes' || notWorkingItems.length >= 4) {
-      return 'C';
-    }
-
-    const bGradeAllowedItems = ['proximitySensor', 'powerButton', 'volumeButtons', 'frontCamera', 'rearCamera', 'bluetooth', 'wifi', 'mobileData', 'flashlight'];
-    const hasCriticalNotWorking = notWorkingItems.some(item => !bGradeAllowedItems.includes(item));
-
-    if (hasCriticalNotWorking) {
-      return 'C';
-    }
-
-    if (notWorkingItems.length >= 1 && notWorkingItems.length <= 3) {
-      return 'B';
-    }
-
-    return 'A';
+    if (hasPhysicalDamage) return 'D'
+    if (notWorkingCount >= 4 || hasDisplayReplaced || hasWhiteSpots) return 'C'
+    if (notWorkingCount >= 1 && notWorkingCount <= 3) return 'B'
+    return 'A'
   };
 
   const [formData, setFormData] = useState(() => {
@@ -112,6 +107,18 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [customModel, setCustomModel] = useState('');
   const [isCustomModel, setIsCustomModel] = useState(false);
+  const [conditionChecklist, setConditionChecklist] = useState({});
+
+  useEffect(() => {
+    if (deviceChecklist.length > 0) {
+      const initialized = initializeChecklist();
+      if (initialData?.conditionChecklist) {
+        setConditionChecklist(initialData.conditionChecklist);
+      } else {
+        setConditionChecklist(initialized);
+      }
+    }
+  }, [deviceChecklist]);
 
   useEffect(() => {
     if (localId) {
@@ -173,29 +180,6 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const BRANDS = brandOptions;
   const MODELS = modelOptions;
 
-  const group1 = [
-    { key: 'frontCamera', label: 'Front Camera' },
-    { key: 'rearCamera', label: 'Rear Camera' },
-    { key: 'earpieceSpeaker', label: 'Earpiece Speaker' },
-    { key: 'simSlot1', label: 'SIM Slot 1' },
-    { key: 'simSlot2', label: 'SIM Slot 2' },
-    { key: 'microphone', label: 'Microphone' },
-    { key: 'loudspeaker', label: 'Loudspeaker' },
-    { key: 'proximitySensor', label: 'Proximity Sensor' },
-    { key: 'powerButton', label: 'Power Button' },
-    { key: 'volumeButtons', label: 'Volume Buttons' },
-    { key: 'mobileData', label: 'Mobile Data' },
-    { key: 'bluetooth', label: 'Bluetooth' },
-    { key: 'wifi', label: 'Wi-Fi' },
-    { key: 'flashlight', label: 'Flashlight' }
-  ];
-
-  const group2 = [
-    { key: 'displayReplaced', label: 'Display Replaced' },
-    { key: 'whiteSpots', label: 'White Spots on Display' },
-    { key: 'physicalDamage', label: 'Physical Damage / Bent' }
-  ];
-
   const handleUploadPhoto = async (file, fieldName) => {
     if (!file) return;
 
@@ -224,17 +208,16 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   };
 
   const handleChecklistChange = (key, value) => {
-    setFormData(prev => {
-      const newChecklist = { ...prev.conditionChecklist, [key]: value };
-      const newGrade = calculateGrade(newChecklist);
-      return {
-        ...prev,
-        conditionChecklist: newChecklist,
-        condition: newGrade,
-        gradeAutoCalculated: newGrade,
-        gradeManualOverride: false
-      };
-    });
+    const newChecklist = { ...conditionChecklist, [key]: value };
+    setConditionChecklist(newChecklist);
+    const newGrade = calculateGrade(newChecklist);
+    setFormData(prev => ({
+      ...prev,
+      conditionChecklist: newChecklist,
+      condition: newGrade,
+      gradeAutoCalculated: newGrade,
+      gradeManualOverride: false
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -246,7 +229,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
     setSaveStatus('saving');
     setError('');
     try {
-      const finalData = { ...formData, createdBy: currentUser.uid };
+      const finalData = { ...formData, conditionChecklist, createdBy: currentUser.uid };
       if (finalData.brand === 'Other') {
         finalData.brand = finalData.customBrand;
       }
@@ -276,7 +259,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
       const finalSerialNumber = formData.serialNumber || generateSerialNumber();
       setFormData(prev => ({ ...prev, serialNumber: finalSerialNumber }));
 
-      const finalData = { ...formData, serialNumber: finalSerialNumber, createdBy: currentUser.uid };
+      const finalData = { ...formData, conditionChecklist, serialNumber: finalSerialNumber, createdBy: currentUser.uid };
       if (finalData.brand === 'Other') {
         finalData.brand = finalData.customBrand;
       }
@@ -670,31 +653,78 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
               Condition &amp; Grade
             </p>
             <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 md:p-6 mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <h5 className="font-bold text-[#0f172a] mb-3 text-sm">Functionality Checks</h5>
-                  {group1.map(item => (
-                    <div key={item.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2.5 border-b border-[#e2e8f0] last:border-0">
-                      <span className="text-sm font-medium text-[#0f172a] flex-1">{item.label}</span>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button type="button" onClick={() => handleChecklistChange(item.key, 'Working')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'Working' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>Working</button>
-                        <button type="button" onClick={() => handleChecklistChange(item.key, 'Not Working')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'Not Working' ? 'bg-red-100 text-[#ED2939] border border-red-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>Not Working</button>
-                      </div>
+              <div className="space-y-4">
+                {deviceChecklist.map((category, catIndex) => (
+                  <div key={catIndex}>
+                    <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-2 border-l-4 border-[#002395] pl-2">
+                      {category.name}
+                    </p>
+                    <div className="space-y-2">
+                      {category.items.map((item, itemIndex) => {
+                        const key = item.label.replace(/\s+/g, '_').toLowerCase()
+                        const value = conditionChecklist[key]
+                        
+                        return (
+                          <div key={itemIndex} className="flex items-center justify-between py-1.5">
+                            <span className="text-sm text-[#0f172a] flex-1 pr-3">{item.label}</span>
+                            
+                            {item.type === 'working_notworking' ? (
+                              <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleChecklistChange(key, 'Working')}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                    value === 'Working'
+                                      ? 'bg-green-500 text-white'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  Working
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleChecklistChange(key, 'Not Working')}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                    value === 'Not Working'
+                                      ? 'bg-[#ED2939] text-white'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  Not Working
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleChecklistChange(key, 'Yes')}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                    value === 'Yes'
+                                      ? 'bg-[#ED2939] text-white'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleChecklistChange(key, 'No')}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                    value === 'No'
+                                      ? 'bg-green-500 text-white'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  No
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                  ))}
-                </div>
-                <div className="space-y-4">
-                  <h5 className="font-bold text-[#0f172a] mb-3 text-sm">Physical Checks</h5>
-                  {group2.map(item => (
-                    <div key={item.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2.5 border-b border-[#e2e8f0] last:border-0">
-                      <span className="text-sm font-medium text-[#0f172a] flex-1">{item.label}</span>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button type="button" onClick={() => handleChecklistChange(item.key, 'Yes')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'Yes' ? 'bg-red-100 text-[#ED2939] border border-red-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>Yes</button>
-                        <button type="button" onClick={() => handleChecklistChange(item.key, 'No')} className={`whitespace-nowrap min-w-[90px] text-center text-sm px-3 py-1.5 rounded-lg font-medium transition ${formData.conditionChecklist[item.key] === 'No' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}>No</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
 

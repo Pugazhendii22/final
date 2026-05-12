@@ -11,7 +11,8 @@ import { printLabel } from '../../utils/printLabel.jsx';
 import Layout from '../../components/common/Layout';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
-const STATUSES = ['Received', 'In Progress', 'Parts Awaiting', 'Completed', 'Awaiting Customer Approval', 'Returned'];
+const STATUSES = ['Received', 'In Progress', 'Parts Awaiting', 'Awaiting Customer Approval', 'Returned'];
+const NON_COMPLETED_STATUSES = ['Received', 'In Progress', 'Parts Awaiting', 'Awaiting Customer Approval', 'Returned'];
 
 const ServiceOrderView = () => {
   const { id } = useParams();
@@ -133,12 +134,27 @@ const ServiceOrderView = () => {
     setUpdatingStatus(true);
     try {
       const updatePayload = { status: newStatus, updatedAt: new Date().toISOString() };
-      if (newStatus === 'Completed' && order.status !== 'Completed') {
-        updatePayload.actualCompletedAt = new Date();
-      }
       await updateDoc(doc(db, 'service_orders', id), updatePayload);
       setOrder(prev => ({ ...prev, ...updatePayload }));
     } catch (err) { console.error(err); } finally { setUpdatingStatus(false); }
+  };
+
+  const handleCompleteOrder = async () => {
+    if (order?.status === 'Completed') return;
+    setUpdatingStatus(true);
+    try {
+      const updatePayload = {
+        status: 'Completed',
+        updatedAt: new Date().toISOString(),
+        actualCompletedAt: new Date()
+      };
+      await updateDoc(doc(db, 'service_orders', id), updatePayload);
+      setOrder(prev => ({ ...prev, ...updatePayload }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const handleTechnicianChange = async (uid) => {
@@ -219,7 +235,7 @@ const ServiceOrderView = () => {
       setOrder(prev => ({ ...prev, ratingToken: token }));
       setRatingDoc({ id: token, ...ratingData });
 
-      const message = `Hi ${order.customerName}, your ${order.brand} ${order.model} service is completed at French Mobiles! 🎉\n\nPlease take a moment to rate our service:\nhttps://${window.location.host}/rate/${token}\n\nThank you for choosing French Mobiles! 🙏`;
+      const message = `Hi ${order.customerName}, your ${order.brand} ${order.model} service (₹${order.estimatedPrice}) is completed at French Mobiles! 🎉\n\nPlease take a moment to rate our service:\nhttps://${window.location.host}/rate/${token}\n\nThank you for choosing French Mobiles! 🙏`;
       const phone = order.customerPhone.replace(/\D/g, '');
       window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(message)}`, '_blank');
 
@@ -334,6 +350,27 @@ const ServiceOrderView = () => {
   const isCompleted = order.status === 'Completed';
   const isOverdue = expectedCompletionDate && !isCompleted && expectedCompletionDate < new Date();
 
+  const canChangeStatus = userRole === 'admin' || (
+    userRole === 'staff' &&
+    order?.technicianUid === currentUser?.uid &&
+    order?.status !== 'Completed' &&
+    order?.status !== 'Returned'
+  );
+
+  const statusColors = order?.status === 'Completed' ? 'bg-green-100 text-green-700' :
+    order?.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
+    order?.status === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
+    order?.status === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
+    order?.status === 'Awaiting Customer Approval' ? 'bg-purple-100 text-purple-700' :
+    'bg-blue-100 text-blue-700';
+
+  const availableStatusOptions = NON_COMPLETED_STATUSES;
+  const filteredStatusOptions = userRole === 'admin'
+    ? availableStatusOptions
+    : availableStatusOptions.slice(Math.max(0, availableStatusOptions.indexOf(order?.status)));
+
+  const showStatusSelect = canChangeStatus && order?.status !== 'Completed';
+
   try {
     return (
   <div className="min-h-screen bg-[#f8fafc] pb-24">
@@ -357,8 +394,28 @@ const ServiceOrderView = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-[#002395] font-mono">{order?.orderNumber}</p>
-            <h2 className="text-xl font-bold text-[#0f172a] mt-1">{order?.customerName}</h2>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+              <p className="text-xs font-bold text-[#002395] font-mono truncate max-w-full">
+                {order?.orderNumber}
+              </p>
+              {showStatusSelect ? (
+                <select
+                  value={order?.status}
+                  onChange={handleStatusChange}
+                  disabled={updatingStatus}
+                  className="w-full md:w-auto max-w-full inline-flex items-center bg-white border border-gray-200 text-[11px] sm:text-xs text-gray-700 rounded-full px-3 py-2 font-semibold whitespace-normal shadow-sm focus:outline-none focus:ring-2 focus:ring-[#002395]"
+                >
+                  {filteredStatusOptions.map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className={`self-start text-[11px] sm:text-xs px-2 py-0.5 rounded-full font-semibold whitespace-normal break-words max-w-full ${statusColors}`}>
+                  {order?.status}
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl font-bold text-[#0f172a] mt-3">{order?.customerName}</h2>
             <p className="text-gray-500 text-sm mt-0.5">
               <i className="fas fa-phone text-green-500 mr-1"></i>
               {order?.customerPhone}
@@ -367,16 +424,6 @@ const ServiceOrderView = () => {
               <p className="text-gray-400 text-xs mt-0.5">{order?.alternatePhone}</p>
             )}
           </div>
-          <span className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold ${
-            order?.status === 'Completed' ? 'bg-green-100 text-green-700' :
-            order?.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
-            order?.status === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
-            order?.status === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
-            order?.status === 'Awaiting Customer Approval' ? 'bg-purple-100 text-purple-700' :
-            'bg-blue-100 text-blue-700'
-          }`}>
-            {order?.status}
-          </span>
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-100">
@@ -420,6 +467,15 @@ const ServiceOrderView = () => {
           >
             <i className="fab fa-whatsapp"></i> Received
           </button>
+          {(userRole?.toLowerCase() === 'admin' || order?.technicianUid === currentUser?.uid) && order?.status !== 'Completed' && (
+            <button
+              onClick={handleCompleteOrder}
+              disabled={updatingStatus}
+              className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-50"
+            >
+              <i className="fas fa-check-circle"></i> Complete
+            </button>
+          )}
           {order?.status === 'Completed' && (
             <button
               onClick={() => openWhatsApp('complete')}

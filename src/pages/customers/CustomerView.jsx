@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { doc, getDoc, updateDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
+import { useAuth } from '../../context/AuthContext';
+import { creditWallet } from '../../utils/walletUtils';
 import CustomerForm from './CustomerForm';
 import Layout from '../../components/common/Layout';
 
@@ -9,6 +11,7 @@ const CustomerView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser } = useAuth();
   const quickData = location.state;
 
   const [customer, setCustomer] = useState(quickData || null);
@@ -19,6 +22,10 @@ const CustomerView = () => {
   const [serviceOrders, setServiceOrders] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState('');
+
+  const [showAddWallet, setShowAddWallet] = useState(false);
+  const [addWalletAmount, setAddWalletAmount] = useState('');
+  const [addWalletReason, setAddWalletReason] = useState('');
 
   const normalizePhone = (phone) => {
     if (!phone) return "";
@@ -42,7 +49,15 @@ const CustomerView = () => {
       ]);
 
       if (docSnap.exists()) {
-        const custData = { id: docSnap.id, ...docSnap.data() };
+        const raw = docSnap.data();
+        // Auto-migrate: add wallet fields if missing on existing customers
+        if (raw.walletBalance === undefined || raw.walletHistory === undefined) {
+          await updateDoc(docRef, {
+            walletBalance: raw.walletBalance ?? 0,
+            walletHistory: raw.walletHistory ?? []
+          });
+        }
+        const custData = { id: docSnap.id, ...raw, walletBalance: raw.walletBalance ?? 0, walletHistory: raw.walletHistory ?? [] };
         setCustomer(custData);
         setLoading(false);
 
@@ -272,6 +287,48 @@ const CustomerView = () => {
         </div>
       </div>
 
+      {/* WALLET */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+          <i className="fas fa-wallet mr-2"></i>Wallet
+        </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs text-gray-400">Current Balance</p>
+            <p className="text-2xl font-bold text-[#002395]">₹{customer?.walletBalance || 0}</p>
+          </div>
+          <button
+            onClick={() => setShowAddWallet(true)}
+            className="bg-[#002395]/10 text-[#002395] px-4 py-2 rounded-xl text-sm font-semibold"
+          >
+            <i className="fas fa-plus mr-1"></i>Add
+          </button>
+        </div>
+        {customer?.walletHistory?.length > 0 && (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {[...(customer.walletHistory || [])].reverse().map((tx, i) => (
+              <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                <div>
+                  <p className="text-xs font-medium text-[#0f172a]">
+                    {tx.reason === 'auto_credit' ? 'Auto Credit (No discount)' :
+                     tx.reason === 'manual_credit' ? 'Manual Credit' :
+                     'Used in Sale'}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {tx.date?.toDate?.()?.toLocaleDateString('en-IN')}
+                  </p>
+                </div>
+                <p className={`text-sm font-bold ${
+                  tx.type === 'credit' ? 'text-green-600' : 'text-[#ED2939]'
+                }`}>
+                  {tx.type === 'credit' ? '+' : '-'}₹{Math.abs(tx.amount)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ID DETAILS */}
       {(customer?.idType || customer?.idNumber) && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -391,9 +448,79 @@ const CustomerView = () => {
       </div>
     )}
 
-  </div>
-  </Layout>
-);
+      {/* ADD WALLET MODAL */}
+      {showAddWallet && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+          <div className="bg-white w-full md:max-w-sm md:mx-auto rounded-t-3xl md:rounded-2xl flex flex-col">
+            <div className="md:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            <div className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[#0f172a]">Add to Wallet</h2>
+                <button onClick={() => setShowAddWallet(false)} className="text-gray-400 p-1">
+                  <i className="fas fa-times text-lg"></i>
+                </button>
+              </div>
+            </div>
+            <div className="px-4 py-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={addWalletAmount}
+                  onChange={e => setAddWalletAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                <input
+                  type="text"
+                  value={addWalletReason}
+                  onChange={e => setAddWalletReason(e.target.value)}
+                  placeholder="e.g. Goodwill credit"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => setShowAddWallet(false)}
+                className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!addWalletAmount || Number(addWalletAmount) <= 0) return
+                  await creditWallet(
+                    customer.id,
+                    Number(addWalletAmount),
+                    'manual_credit',
+                    addWalletReason || 'Manual top-up',
+                    currentUser.uid
+                  )
+                  setShowAddWallet(false)
+                  setAddWalletAmount('')
+                  setAddWalletReason('')
+                  fetchCustomerData()
+                }}
+                className="flex-1 bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold"
+              >
+                Add to Wallet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+    </Layout>
+  );
 };
 
 export default CustomerView;

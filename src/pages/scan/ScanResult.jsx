@@ -252,6 +252,12 @@ const ScanResult = () => {
               <p className="text-gray-500 text-sm mt-0.5">{d?.customerPhone}</p>
               <p className="text-2xl font-bold text-[#002395] mt-2">₹{d?.totalAmount}</p>
             </div>
+            {d?.walletUsed > 0 && (
+              <div className="flex justify-between text-sm px-4">
+                <span className="text-[#002395]">Wallet Used</span>
+                <span className="font-medium text-[#002395]">- ₹{d?.walletUsed}</span>
+              </div>
+            )}
             {d?.items?.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                 <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">

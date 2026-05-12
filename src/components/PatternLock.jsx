@@ -119,121 +119,102 @@ const PatternLock = ({ value = [], onChange, readOnly = false }) => {
     }` : '';
 
   return (
-    <div className="space-y-3" style={{ touchAction: 'none', userSelect: 'none' }}>
+    <div className="w-full" style={{ touchAction: 'none', userSelect: 'none' }}>
+      <p className="text-sm text-gray-500 text-center mb-3">
+        {pattern.length === 0 
+          ? 'Draw the unlock pattern' 
+          : `Pattern recorded (${pattern.length} points)`}
+      </p>
+      
       <div
-        className="relative w-full max-w-[240px] aspect-square mx-auto"
+        className="bg-[#f0f4ff] rounded-2xl p-6 flex flex-col items-center justify-center relative"
         onPointerDown={handlePointerStart}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
         onPointerLeave={handlePointerEnd}
       >
-        <svg 
-          ref={svgRef}
-          className="absolute inset-0 w-full h-full" 
-          viewBox="0 0 200 200" 
-          preserveAspectRatio="xMidYMid meet"
-        >
-          {/* Subtle background */}
-          <rect width="200" height="200" fill="#f8fafc" rx="8" />
-          
-          {/* Grid lines */}
-          <defs>
-            <pattern id="dotGrid" width="66.67" height="66.67" patternUnits="userSpaceOnUse">
-              <circle cx="33.33" cy="33.33" r="1" fill="#e2e8f0" opacity="0.5"/>
-            </pattern>
-          </defs>
-          <rect width="200" height="200" fill="url(#dotGrid)" />
-          
-          {/* Pattern path */}
-          {pathData && (
-            <path
-              d={pathData}
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.8"
-            />
-          )}
-          
-          {/* Dot connections (thicker) */}
-          {points.length > 1 && (
-            <path
-              d={`M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`}
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.9"
-            />
-          )}
-          
-          {/* Active dots */}
-          {points.map((point, index) => (
-            <circle 
-              key={`active-${point.id}`} 
-              cx={point.cx} 
-              cy={point.cy} 
-              r="14" 
-              fill="#2563eb" 
-              opacity="0.9"
-            />
-          ))}
-          
-          {/* Current position indicator */}
-          {isDrawing && (
-            <circle 
-              cx={currentPos.x} 
-              cy={currentPos.y} 
-              r="10" 
-              fill="#2563eb" 
-              opacity="0.6"
-            />
-          )}
-        </svg>
-
-        <div className="grid grid-cols-3 gap-0 w-full h-full absolute inset-0">
-          {DOTS.map(({ id }, index) => {
-            const isSelected = pattern.includes(id);
-            const isCurrent = isDrawing && getNearestDot(currentPos.x, currentPos.y) === id;
+        <div style={{ width: '240px', height: '240px', position: 'relative' }}>
+          <svg 
+            ref={svgRef}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+            viewBox="0 0 200 200" 
+            preserveAspectRatio="xMidYMid meet"
+          >
+            {/* Pattern path */}
+            {pathData && (
+              <path
+                d={pathData}
+                fill="none"
+                stroke="#002395"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.8"
+              />
+            )}
             
-            return (
-              <div
-                key={id}
-                className="relative w-full h-full flex items-center justify-center"
-              >
+            {/* Dot connections */}
+            {points.length > 1 && (
+              <path
+                d={`M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`}
+                fill="none"
+                stroke="#002395"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.8"
+              />
+            )}
+            
+            {/* Current position indicator */}
+            {isDrawing && (
+              <circle 
+                cx={currentPos.x} 
+                cy={currentPos.y} 
+                r="8" 
+                fill="#002395" 
+                opacity="0.4"
+              />
+            )}
+          </svg>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', width: '100%', height: '100%' }}>
+            {DOTS.map(({ id }, index) => {
+              const isSelected = pattern.includes(id);
+              
+              return (
                 <div
-                  className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-                    isSelected 
-                      ? 'bg-blue-600 border-blue-600 scale-125 shadow-lg' 
-                      : isCurrent
-                        ? 'bg-blue-300 border-blue-400 scale-110 shadow-md'
-                        : 'bg-white border-gray-300 hover:border-blue-400'
-                  }`}
-                />
-              </div>
-            );
-          })}
+                  key={id}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <div
+                    className={`flex items-center justify-center transition-all duration-200 ${
+                      isSelected 
+                        ? 'w-14 h-14 rounded-full bg-[#002395] border-2 border-[#002395] shadow-lg' 
+                        : 'w-14 h-14 rounded-full bg-white border-2 border-gray-300 shadow-sm'
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="w-4 h-4 rounded-full bg-white" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
       
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          {pattern.length > 0 ? `Pattern: ${pattern.join(' → ')}` : 'Draw your pattern'}
-        </p>
-        {!readOnly && (
-          <button 
-            type="button" 
-            onClick={clearPattern} 
-            className="text-sm text-slate-600 hover:text-slate-800 underline"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {pattern.length > 0 && !readOnly && (
+        <button
+          type="button"
+          onClick={clearPattern}
+          className="mt-3 w-full bg-red-50 text-[#ED2939] rounded-xl py-2 text-sm font-semibold border border-red-100"
+        >
+          <i className="fas fa-redo mr-2"></i>Clear Pattern
+        </button>
+      )}
     </div>
   );
 };

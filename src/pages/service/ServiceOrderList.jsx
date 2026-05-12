@@ -57,6 +57,7 @@ const ServiceOrderList = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteWarning, setDeleteWarning] = useState('');
+  const [whatsAppDialog, setWhatsAppDialog] = useState({ open: false });
 
   const STATUSES = ['Received', 'In Progress', 'Parts Awaiting', 'Completed', 'Awaiting Customer Approval', 'Returned'];
 
@@ -222,7 +223,7 @@ const ServiceOrderList = () => {
 
   const handleSendRatingWhatsApp = () => {
     if (ratingDataForModal) {
-      const message = `Hi ${ratingDataForModal.customerName}, your ${ratingDataForModal.brand} ${ratingDataForModal.model} service is completed at French Mobiles! 🎉\n\nPlease rate our service:\nhttps://${window.location.host}/rate/${ratingDataForModal.token}\n\nThank you for choosing French Mobiles! 🙏`;
+      const message = `Hi ${ratingDataForModal.customerName}, your ${ratingDataForModal.brand} ${ratingDataForModal.model} service (₹${completedOrderForBill?.estimatedPrice || 0}) is completed at French Mobiles! 🎉\n\nPlease rate our service:\nhttps://${window.location.host}/rate/${ratingDataForModal.token}\n\nThank you for choosing French Mobiles! 🙏`;
       const phone = ratingDataForModal.customerPhone.replace(/\D/g, '');
       window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(message)}`, '_blank');
     }
@@ -295,6 +296,74 @@ const ServiceOrderList = () => {
     const phone = order.customerPhone.replace(/\D/g, '');
     const message = `Hi ${order.customerName}, regarding your service order ${order.orderNumber} for ${order.brand} ${order.model}. - French Mobiles`;
     window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handleQuickStatusChange = async (order, newStatus) => {
+    if (order.status === newStatus) return
+
+    // Check access - staff can only change their own orders
+    if (userRole === 'staff' && order.technicianUid !== currentUser?.uid) {
+      alert('You can only change status of orders assigned to you.')
+      return
+    }
+
+    // Staff cannot revert from Completed
+    if (userRole === 'staff' && order.status === 'Completed') {
+      alert('Completed orders can only be changed by admin.')
+      return
+    }
+
+    try {
+      // Update Firestore
+      const updateData = { status: newStatus, updatedAt: new Date() }
+      if (newStatus === 'Completed') {
+        updateData.actualCompletedAt = new Date()
+      }
+      await updateDoc(doc(db, 'service_orders', order.id), updateData)
+
+      // Update local state immediately
+      setOrders(prev => prev.map(o => 
+        o.id === order.id ? { ...o, status: newStatus } : o
+      ))
+
+      // Generate WhatsApp message based on new status
+      const phone = order.customerPhone || order.alternatePhone
+      if (phone) {
+        let message = ''
+        
+        if (newStatus === 'Received') {
+          message = `Hi ${order.customerName}, we have received your ${order.brand} ${order.model} for service. Order: ${order.orderNumber}. We will update you shortly. - French Mobiles`
+        } else if (newStatus === 'In Progress') {
+          message = `Hi ${order.customerName}, your ${order.brand} ${order.model} (Order: ${order.orderNumber}) is now being worked on by our technician. We will notify you once done. - French Mobiles`
+        } else if (newStatus === 'Parts Awaiting') {
+          message = `Hi ${order.customerName}, we are waiting for parts for your ${order.brand} ${order.model} (Order: ${order.orderNumber}). We will update you as soon as parts arrive. - French Mobiles`
+        } else if (newStatus === 'Awaiting Customer Approval') {
+          message = `Hi ${order.customerName}, your ${order.brand} ${order.model} (Order: ${order.orderNumber}) requires your approval for additional work. Please visit or call us. - French Mobiles`
+        } else if (newStatus === 'Completed') {
+          const finalAmount = order.estimatedPrice || 0
+          const advance = order.advancePaid || 0
+          const balance = finalAmount - advance
+          message = `Hi ${order.customerName}, your ${order.brand} ${order.model} (Order: ${order.orderNumber}) is ready for pickup! 🎉\n\nService Amount: Rs.${finalAmount}\nAdvance Paid: Rs.${advance}\nBalance Due: Rs.${balance}\n\nPlease visit us to collect your device. - French Mobiles`
+        } else if (newStatus === 'Returned') {
+          message = `Hi ${order.customerName}, your ${order.brand} ${order.model} (Order: ${order.orderNumber}) has been returned. Thank you for choosing French Mobiles. - French Mobiles`
+        }
+
+        if (message) {
+          // Show WhatsApp confirmation dialog
+          setWhatsAppDialog({
+            open: true,
+            phone: phone,
+            message: message,
+            customerName: order.customerName,
+            newStatus: newStatus
+          })
+        }
+      }
+
+    } catch (error) {
+      console.error('Status update error:', error)
+      alert('Failed to update status. Please try again.')
+    }
   };
 
   const normalizeDate = (value) => {
@@ -447,14 +516,19 @@ return (
             onClick={() => {
               if (tab === 'Overdue') {
                 setActiveTab('Overdue');
-                setStatusFilter('All');
+                setStatusFilter('');
+              } else if (tab === 'All') {
+                setActiveTab('All');
+                setStatusFilter('');
               } else {
                 setActiveTab('All');
                 setStatusFilter(tab);
               }
             }}
             className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              (tab === 'Overdue' && activeTab === 'Overdue') || (tab !== 'Overdue' && activeTab === 'All' && statusFilter === tab)
+              (tab === 'Overdue' && activeTab === 'Overdue') ||
+              (tab === 'All' && activeTab === 'All' && !statusFilter) ||
+              (tab !== 'Overdue' && tab !== 'All' && activeTab === 'All' && statusFilter === tab)
                 ? 'bg-[#002395] text-white shadow-md'
                 : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
@@ -493,15 +567,25 @@ return (
                     <span className="text-xs font-bold text-[#002395] font-mono">{order.orderNumber}</span>
                     <h3 className="text-lg font-bold text-[#0f172a] mt-1">{order.customerName}</h3>
                   </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-                    order.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                    order.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
-                    order.status === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
-                    order.status === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {order.status}
-                  </span>
+                  <select
+                    value={order.status}
+                    onChange={e => handleQuickStatusChange(order, e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                    className={`text-xs px-2 py-1 rounded-lg border-0 font-semibold focus:outline-none ${
+                      order.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                      order.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
+                      order.status === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
+                      order.status === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
+                      order.status === 'Awaiting Customer Approval' ? 'bg-purple-100 text-purple-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    <option value="Received">Received</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Parts Awaiting">Parts Awaiting</option>
+                    <option value="Awaiting Customer Approval">Awaiting Customer Approval</option>
+                    <option value="Returned">Returned</option>
+                  </select>
                 </div>
 
                 <div className="text-sm text-gray-500 flex items-center gap-2 mb-3">
@@ -637,7 +721,7 @@ return (
           </p>
           
           <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-6 text-sm text-gray-700 whitespace-pre-wrap break-words">
-            Hi {ratingDataForModal.customerName}, your {ratingDataForModal.brand} {ratingDataForModal.model} service is completed at French Mobiles! 🎉<br/><br/>
+            Hi {ratingDataForModal.customerName}, your {ratingDataForModal.brand} {ratingDataForModal.model} service (₹{completedOrderForBill?.estimatedPrice || 0}) is completed at French Mobiles! 🎉<br/><br/>
             Please rate our service:<br/>
             https://{window.location.host}/rate/{ratingDataForModal.token}<br/><br/>
             Thank you for choosing French Mobiles! 🙏
@@ -689,6 +773,54 @@ return (
       title="Delete Service Order"
       message={deleteWarning}
     />
+
+    {/* WHATSAPP CONFIRMATION DIALOG */}
+    {whatsAppDialog.open && (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+        <div className="bg-white w-full md:max-w-lg md:mx-auto rounded-t-3xl md:rounded-2xl flex flex-col max-h-[90vh]">
+          <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
+            <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+          <div className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#0f172a]">Send WhatsApp Update</h2>
+              <button onClick={() => setWhatsAppDialog({ open: false })} className="text-gray-400 p-1">
+                <i className="fas fa-times text-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            <p className="text-sm text-gray-500">
+              Status changed to <span className="font-bold text-[#002395]">{whatsAppDialog.newStatus}</span>
+            </p>
+            <p className="text-sm font-medium text-gray-700">Message preview:</p>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-wrap">
+              {whatsAppDialog.message}
+            </div>
+            <p className="text-xs text-gray-400">
+              Sending to: {whatsAppDialog.phone}
+            </p>
+          </div>
+          <div className="flex-shrink-0 px-4 py-3 border-t border-gray-100 flex gap-3">
+            <button
+              onClick={() => setWhatsAppDialog({ open: false })}
+              className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-semibold"
+            >
+              Skip
+            </button>
+            <a
+              href={`https://wa.me/91${whatsAppDialog.phone}?text=${encodeURIComponent(whatsAppDialog.message)}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setWhatsAppDialog({ open: false })}
+              className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              <i className="fab fa-whatsapp"></i> Send
+            </a>
+          </div>
+        </div>
+      </div>
+    )}
 
       {/* FLOATING ADD BUTTON */}
       <button

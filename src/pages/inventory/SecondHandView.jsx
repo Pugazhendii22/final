@@ -2,33 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/firebase';
+import { useSettings } from '../../context/SettingsContext';
 import SecondHandForm from './SecondHandForm';
 import { getLabelNumber } from '../../utils/getLabelNumber';
 import { printLabel } from '../../utils/printLabel.jsx';
 import Layout from '../../components/common/Layout';
-
-const group1 = [
-  { key: 'frontCamera', label: 'Front Camera' },
-  { key: 'rearCamera', label: 'Rear Camera' },
-  { key: 'earpieceSpeaker', label: 'Earpiece Speaker' },
-  { key: 'simSlot1', label: 'SIM Slot 1' },
-  { key: 'simSlot2', label: 'SIM Slot 2' },
-  { key: 'microphone', label: 'Microphone' },
-  { key: 'loudspeaker', label: 'Loudspeaker' },
-  { key: 'proximitySensor', label: 'Proximity Sensor' },
-  { key: 'powerButton', label: 'Power Button' },
-  { key: 'volumeButtons', label: 'Volume Buttons' },
-  { key: 'mobileData', label: 'Mobile Data' },
-  { key: 'bluetooth', label: 'Bluetooth' },
-  { key: 'wifi', label: 'Wi-Fi' },
-  { key: 'flashlight', label: 'Flashlight' }
-];
-
-const group2 = [
-  { key: 'displayReplaced', label: 'Display Replaced' },
-  { key: 'whiteSpots', label: 'White Spots on Display' },
-  { key: 'physicalDamage', label: 'Physical Damage / Bent' }
-];
 
 const gradeColor = (g) => ({ 
   A: 'bg-green-100 text-green-700', 
@@ -40,6 +18,7 @@ const gradeColor = (g) => ({
 const SecondHandView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { deviceChecklist } = useSettings();
   const [mobile, setMobile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
@@ -247,36 +226,29 @@ const SecondHandView = () => {
               <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
                 Device Checklist
               </p>
-              <div className="mb-4">
-                <h4 className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-widest">Functionality</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {group1.map(item => (
-                    <div key={item.key} className="flex items-center gap-2">
-                      <i className={`fas ${
-                        mobile.conditionChecklist[item.key] === 'Working'
-                          ? 'fa-check-circle text-green-500'
-                          : 'fa-times-circle text-[#ED2939]'
-                      } text-sm`}></i>
-                      <span className="text-xs text-gray-600">{item.label}</span>
-                    </div>
-                  ))}
+              {deviceChecklist.map((category, catIndex) => (
+                <div key={catIndex} className="mb-4">
+                  <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-2 border-l-4 border-[#002395] pl-2">
+                    {category.name}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {category.items.map((item, itemIndex) => {
+                      const key = item.label.replace(/\s+/g, '_').toLowerCase()
+                      const value = mobile?.conditionChecklist?.[key]
+                      if (!value) return null
+                      
+                      const isGood = value === 'Working' || value === 'No'
+                      
+                      return (
+                        <div key={itemIndex} className="flex items-center gap-2">
+                          <i className={`fas ${isGood ? 'fa-check-circle text-green-500' : 'fa-times-circle text-[#ED2939]'} text-sm flex-shrink-0`}></i>
+                          <span className="text-xs text-gray-600 truncate">{item.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-widest">Physical Condition</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {group2.map(item => (
-                    <div key={item.key} className="flex items-center gap-2">
-                      <i className={`fas ${
-                        mobile.conditionChecklist[item.key] === 'No'
-                          ? 'fa-check-circle text-green-500'
-                          : 'fa-exclamation-circle text-[#ED2939]'
-                      } text-sm`}></i>
-                      <span className="text-xs text-gray-600">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
           )}
 

@@ -38,9 +38,12 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
     };
   });
   
+  const [discountCategory, setDiscountCategory] = useState('');
   const [customers, setCustomers] = useState([]);
   const [secondHandMobiles, setSecondHandMobiles] = useState([]);
   const [products, setProducts] = useState([]);
+  const [customerWalletBalance, setCustomerWalletBalance] = useState(0);
+  const [useWalletAmount, setUseWalletAmount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,6 +75,18 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
     fetchData();
   }, []);
 
+  // Recalculate discount when items or discount category changes
+  useEffect(() => {
+    if (!discountCategory) return;
+    const subtotal = formData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+    let percentage = 0;
+    if (discountCategory === 'family') percentage = 15;
+    else if (discountCategory === 'friends') percentage = 10;
+    else if (discountCategory === 'regular') percentage = 5;
+    const discountAmount = Math.round((subtotal * percentage) / 100);
+    setFormData(prev => ({ ...prev, discount: discountAmount }));
+  }, [formData.items, discountCategory]);
+
   const handleCustomerSelect = (c) => {
     setFormData(prev => ({ 
       ...prev, 
@@ -81,6 +96,30 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
       alternatePhone: c.alternatePhone || '',
       customerAddress: c.address || c.customerAddress || ''
     }));
+    setCustomerWalletBalance(Number(c.walletBalance) || 0);
+    setUseWalletAmount(0);
+  };
+
+  const handleDiscountCategoryChange = (e) => {
+    const category = e.target.value;
+    setDiscountCategory(category);
+
+    if (!category) {
+      // Manual mode - clear auto discount
+      setFormData(prev => ({ ...prev, discount: 0 }));
+      return;
+    }
+
+    // Calculate discount based on current total
+    const currentTotal = formData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+    
+    let percentage = 0;
+    if (category === 'family') percentage = 15;
+    else if (category === 'friends') percentage = 10;
+    else if (category === 'regular') percentage = 5;
+
+    const discountAmount = Math.round((currentTotal * percentage) / 100);
+    setFormData(prev => ({ ...prev, discount: discountAmount }));
   };
 
   const addItem = (type) => {
@@ -133,7 +172,9 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
 
   const subtotal = formData.items.reduce((sum, item) => sum + (item.total || 0), 0);
   const totalAmount = subtotal - (Number(formData.discount) || 0);
-  const balanceDue = totalAmount - (Number(formData.amountPaid) || 0);
+  const walletUsed = Number(useWalletAmount) || 0;
+  const finalAmount = totalAmount - walletUsed;
+  const balanceDue = finalAmount - (Number(formData.amountPaid) || 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -159,8 +200,11 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
       const finalData = { 
         ...formData, 
         subtotal, 
-        totalAmount, 
+        totalAmount,
+        walletUsed,
+        finalAmount,
         balanceDue,
+        discountCategory: discountCategory || 'manual',
         createdBy: currentUser.uid 
       };
       delete finalData.linkedServiceOrderNumber;
@@ -416,6 +460,21 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Discount Category
+            </label>
+            <select
+              value={discountCategory}
+              onChange={handleDiscountCategoryChange}
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395] bg-white"
+            >
+              <option value="">No Category (Manual)</option>
+              <option value="family">Family</option>
+              <option value="friends">Friends</option>
+              <option value="regular">Regular Customer</option>
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Discount</label>
             <input
               type="number"
@@ -427,6 +486,56 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
               className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
             />
           </div>
+          {customerWalletBalance > 0 && (
+            <div className="bg-[#002395]/5 border border-[#002395]/20 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <i className="fas fa-wallet text-[#002395] text-sm"></i>
+                  <p className="text-sm font-semibold text-[#002395]">
+                    Wallet Balance: ₹{customerWalletBalance}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Use from wallet (max ₹{Math.min(customerWalletBalance, totalAmount)})
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    min="0"
+                    max={Math.min(customerWalletBalance, totalAmount)}
+                    value={useWalletAmount}
+                    onChange={e => {
+                      const val = Math.min(
+                        Number(e.target.value) || 0,
+                        customerWalletBalance,
+                        totalAmount
+                      )
+                      setUseWalletAmount(val)
+                    }}
+                    className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setUseWalletAmount(Math.min(customerWalletBalance, totalAmount))}
+                    className="bg-[#002395] text-white rounded-xl px-3 py-2 text-xs font-semibold whitespace-nowrap"
+                  >
+                    Use All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseWalletAmount(0)}
+                    className="bg-gray-100 text-gray-600 rounded-xl px-3 py-2 text-xs font-semibold"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea
@@ -447,13 +556,27 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
         </div>
         {Number(formData.discount) > 0 && (
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Discount</span>
+            <span className="text-green-600">
+              Discount {discountCategory ? `(${discountCategory === 'family' ? 'Family' : discountCategory === 'friends' ? 'Friends' : 'Regular'})` : ''}
+            </span>
             <span className="font-medium text-green-600">- ₹{formData.discount}</span>
           </div>
         )}
+        {walletUsed > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-[#002395]">
+              <i className="fas fa-wallet mr-1"></i>Wallet Used
+            </span>
+            <span className="font-medium text-[#002395]">- ₹{walletUsed}</span>
+          </div>
+        )}
         <div className="flex justify-between text-base font-bold border-t border-gray-200 pt-2">
-          <span>Total</span>
-          <span className="text-[#002395]">₹{totalAmount}</span>
+          <span>Final Amount</span>
+          <span className="text-[#002395]">₹{finalAmount}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Amount Paid</span>
+          <span className="font-medium text-green-600">₹{Number(formData.amountPaid) || 0}</span>
         </div>
         <div className="flex justify-between text-sm font-semibold">
           <span>Balance Due</span>

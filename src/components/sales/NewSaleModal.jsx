@@ -1,9 +1,13 @@
 import { useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, increment } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
+import { useAuth } from '../../context/AuthContext';
+import { creditWallet, debitWallet } from '../../utils/walletUtils';
 import SalesForm from '../../pages/sales/SalesForm';
 
 const NewSaleModal = ({ isOpen = true, modalOnly = false, onClose, prefillData, onSuccess }) => {
+  const { currentUser } = useAuth();
+
   const generateInvoiceNumber = async () => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
@@ -21,37 +25,43 @@ const NewSaleModal = ({ isOpen = true, modalOnly = false, onClose, prefillData, 
   const handleSaveSale = async (data) => {
     const invoiceNumber = await generateInvoiceNumber();
 
+    // Resolve customer ID
+    let customerId = data.customerId;
+    const custSnap = await getDocs(collection(db, 'customers'));
+    const existingCust = custSnap.docs.find(d => d.data().phone === data.customerPhone);
+    if (customerId && !existingCust) {
+      // customerId already set from autocomplete
+    } else if (existingCust) {
+      customerId = existingCust.id;
+    } else {
+      // Auto-create customer if phone is new
+      const newCustRef = await addDoc(collection(db, 'customers'), {
+        name: data.customerName,
+        phone: data.customerPhone,
+        walletBalance: 0,
+        walletHistory: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      customerId = newCustRef.id;
+    }
+
     const newSale = {
       ...data,
+      customerId,
       invoiceNumber,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    const custSnap = await getDocs(collection(db, 'customers'));
-    const customers = [];
-    custSnap.forEach(doc => customers.push(doc.data()));
-
-    // Auto-create customer if phone is new
-    if (!customers.find(c => c.phone === data.customerPhone)) {
-      await addDoc(collection(db, 'customers'), {
-        name: data.customerName,
-        phone: data.customerPhone,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-    }
-
     // Update inventory logic
     for (const item of data.items) {
       if (item.type === 'Second-hand') {
-        // Mark as sold
         await updateDoc(doc(db, 'second_hand_mobiles', item.itemId), {
           status: 'sold',
           updatedAt: new Date().toISOString()
         });
       } else if (item.type === 'New') {
-        // Reduce stock
         try {
           const productRef = doc(db, 'products', item.itemId);
           await updateDoc(productRef, {
@@ -64,6 +74,16 @@ const NewSaleModal = ({ isOpen = true, modalOnly = false, onClose, prefillData, 
     }
 
     const docRef = await addDoc(collection(db, 'sales'), newSale);
+
+    // Wallet operations after sale saved
+    const walletUsed = Number(data.walletUsed) || 0;
+    if (walletUsed > 0 && customerId) {
+      await debitWallet(customerId, walletUsed, 'used_in_sale', docRef.id, currentUser.uid);
+    }
+    const discount = Number(data.discount) || 0;
+    if (discount === 0 && customerId) {
+      await creditWallet(customerId, 5, 'auto_credit', docRef.id, currentUser.uid);
+    }
 
     if (data.linkedServiceOrderId) {
       await updateDoc(doc(db, 'service_orders', data.linkedServiceOrderId), {

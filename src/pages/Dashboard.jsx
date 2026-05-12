@@ -322,16 +322,30 @@ const Dashboard = () => {
                     <p className="text-xs text-[#64748b]">Products need restock</p>
                   </div>
                 </div>
-                <div onClick={() => navigate('/sales')} className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition cursor-pointer border border-[#e2e8f0] border-l-4 border-purple-400 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
-                    <i className="fas fa-file-invoice text-purple-400 text-lg"></i>
+                {userRole?.toLowerCase() === 'admin' && (
+                  <div onClick={() => navigate('/due-payments')} className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition cursor-pointer border border-[#e2e8f0] border-l-4 border-[#ED2939] flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                      <i className="fas fa-rupee-sign text-[#ED2939] text-lg"></i>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#64748b] font-medium">Due Payments</p>
+                      <p className="text-xl font-bold text-[#ED2939]">₹{stats.pendingBillsAmt.toLocaleString()}</p>
+                      <p className="text-xs text-[#64748b]">Pending from customers</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-[#64748b] font-medium">Pending Bills</p>
-                    <p className="text-xl font-bold text-purple-500">₹{stats.pendingBillsAmt.toLocaleString()}</p>
-                    <p className="text-xs text-[#64748b]">Balance due from customers</p>
+                )}
+                {userRole?.toLowerCase() !== 'admin' && (
+                  <div onClick={() => navigate('/sales')} className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition cursor-pointer border border-[#e2e8f0] border-l-4 border-purple-400 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
+                      <i className="fas fa-file-invoice text-purple-400 text-lg"></i>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#64748b] font-medium">Pending Bills</p>
+                      <p className="text-xl font-bold text-purple-500">₹{stats.pendingBillsAmt.toLocaleString()}</p>
+                      <p className="text-xs text-[#64748b]">Balance due from customers</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* PART 5 - ROW 3: INFO STATS */}

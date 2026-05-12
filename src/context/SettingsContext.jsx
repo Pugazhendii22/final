@@ -102,6 +102,58 @@ const DEFAULT_SETTINGS = {
   },
   rom_options: {
     items: ["8GB", "16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB"]
+  },
+  device_checklist: {
+    categories: [
+      {
+        name: "Display",
+        items: [
+          { label: "Display Clarity", type: "working_notworking" },
+          { label: "White Spots on Display", type: "yes_no" },
+          { label: "Display Replaced", type: "yes_no" }
+        ]
+      },
+      {
+        name: "Camera",
+        items: [
+          { label: "Front Camera (Clear dust)", type: "working_notworking" },
+          { label: "Rear Camera (Clear dust)", type: "working_notworking" }
+        ]
+      },
+      {
+        name: "Audio",
+        items: [
+          { label: "Earpiece Speaker", type: "working_notworking" },
+          { label: "Loudspeaker", type: "working_notworking" },
+          { label: "Microphone", type: "working_notworking" }
+        ]
+      },
+      {
+        name: "Connectivity",
+        items: [
+          { label: "Mobile Data", type: "working_notworking" },
+          { label: "Bluetooth", type: "working_notworking" },
+          { label: "Wi-Fi", type: "working_notworking" }
+        ]
+      },
+      {
+        name: "Physical",
+        items: [
+          { label: "Power Button", type: "working_notworking" },
+          { label: "Volume Buttons", type: "working_notworking" },
+          { label: "Proximity Sensor", type: "working_notworking" },
+          { label: "Flashlight", type: "working_notworking" },
+          { label: "Physical Damage / Bent", type: "yes_no" }
+        ]
+      },
+      {
+        name: "SIM",
+        items: [
+          { label: "SIM Slot 1", type: "working_notworking" },
+          { label: "SIM Slot 2", type: "working_notworking" }
+        ]
+      }
+    ]
   }
 }
 
@@ -126,7 +178,7 @@ export const SettingsProvider = ({ children }) => {
         }
       }
 
-      const keys = ['complaint_types', 'pre_delivery_checklist', 'brands', 'accessories', 'models', 'ram_options', 'rom_options']
+      const keys = ['complaint_types', 'pre_delivery_checklist', 'brands', 'accessories', 'models', 'ram_options', 'rom_options', 'device_checklist']
       const docs = await Promise.all(
         keys.map(key => getDoc(doc(db, 'settings', key)))
       )
@@ -137,7 +189,11 @@ export const SettingsProvider = ({ children }) => {
       docs.forEach((docSnap, i) => {
         const key = keys[i]
         if (docSnap.exists()) {
-          newSettings[key] = docSnap.data()
+          if (key === 'device_checklist') {
+            newSettings[key] = docSnap.data()
+          } else {
+            newSettings[key] = docSnap.data()
+          }
         } else {
           newSettings[key] = DEFAULT_SETTINGS[key]
           missingKeys.push(key)
@@ -168,10 +224,12 @@ export const SettingsProvider = ({ children }) => {
     try {
       if (key === 'models') {
         await setDoc(doc(db, 'settings', key), items)
+      } else if (key === 'device_checklist') {
+        await setDoc(doc(db, 'settings', key), items)
       } else {
         await setDoc(doc(db, 'settings', key), { items })
       }
-      const newSettings = { ...settings, [key]: key === 'models' ? items : { items } }
+      const newSettings = { ...settings, [key]: key === 'models' || key === 'device_checklist' ? items : { items } }
       setSettings(newSettings)
       localStorage.setItem(CACHE_KEY, JSON.stringify({
         data: newSettings,
@@ -201,7 +259,8 @@ export const SettingsProvider = ({ children }) => {
         accessories: settings.accessories?.items || [],
         models: settings.models || {},
         ramOptions: settings.ram_options?.items || ["2GB", "3GB", "4GB", "6GB", "8GB", "12GB", "16GB"],
-        romOptions: settings.rom_options?.items || ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB"]
+        romOptions: settings.rom_options?.items || ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB"],
+        deviceChecklist: settings.device_checklist?.categories || []
       }}
     >
       {children}

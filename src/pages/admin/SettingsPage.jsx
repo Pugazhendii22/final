@@ -21,6 +21,8 @@ const SettingsPage = () => {
   const [selectedModelBrand, setSelectedModelBrand] = useState('')
   const [newModelText, setNewModelText] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [selectedChecklistCategory, setSelectedChecklistCategory] = useState(0)
+  const [newChecklistItem, setNewChecklistItem] = useState({ label: '', type: 'working_notworking' })
 
   if (userRole !== 'admin') {
     return <Navigate to="/dashboard" replace />
@@ -95,6 +97,49 @@ const SettingsPage = () => {
     } catch (error) {
       console.error(error)
       setRefreshing(false)
+    }
+  }
+
+  const handleAddChecklistItem = async () => {
+    const label = newChecklistItem.label.trim()
+    if (!label || selectedChecklistCategory === null) return
+    
+    const categories = [...(settings.device_checklist?.categories || [])]
+    const category = { ...categories[selectedChecklistCategory] }
+    category.items = [...(category.items || []), { label, type: newChecklistItem.type }]
+    categories[selectedChecklistCategory] = category
+    
+    await updateSetting('device_checklist', { categories })
+    setNewChecklistItem({ label: '', type: 'working_notworking' })
+  }
+
+  const handleDeleteChecklistItem = async (catIndex, itemIndex) => {
+    const categories = [...(settings.device_checklist?.categories || [])]
+    const category = { ...categories[catIndex] }
+    category.items = category.items.filter((_, i) => i !== itemIndex)
+    categories[catIndex] = category
+    await updateSetting('device_checklist', { categories })
+  }
+
+  const handleAddCategory = async () => {
+    const name = prompt('Enter category name:')
+    if (!name?.trim()) return
+    const categories = [...(settings.device_checklist?.categories || [])]
+    categories.push({ name: name.trim(), items: [] })
+    await updateSetting('device_checklist', { categories })
+    setSelectedChecklistCategory(categories.length - 1)
+  }
+
+  const handleDeleteChecklistCategory = async (index) => {
+    const categories = [...(settings.device_checklist?.categories || [])]
+    categories.splice(index, 1)
+    await updateSetting('device_checklist', { categories })
+    if (categories.length === 0) {
+      setSelectedChecklistCategory(null)
+    } else if (selectedChecklistCategory === index) {
+      setSelectedChecklistCategory(Math.max(0, index - 1))
+    } else if (selectedChecklistCategory > index) {
+      setSelectedChecklistCategory(prev => prev - 1)
     }
   }
 
@@ -207,6 +252,101 @@ const SettingsPage = () => {
                 >
                   Add
                 </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+            <i className="fas fa-clipboard-list mr-2"></i>
+            Device Checklist Categories
+          </p>
+
+          {/* Category selector */}
+          <div className="mb-3">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+              {(settings.device_checklist?.categories || []).map((cat, i) => (
+                <div key={i} className="relative group flex items-center">
+                  <button
+                    onClick={() => setSelectedChecklistCategory(i)}
+                    className={`flex items-center gap-2 whitespace-nowrap rounded-full text-xs font-semibold transition px-4 py-1.5 ${
+                      selectedChecklistCategory === i
+                        ? 'bg-[#002395] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                    type="button"
+                  >
+                    {cat.name}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteChecklistCategory(i)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full border border-gray-200 bg-white text-[#ED2939] text-[10px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                    aria-label={`Delete checklist category ${cat.name}`}
+                    type="button"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={handleAddCategory}
+                className="flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700"
+              >
+                + Add Category
+              </button>
+            </div>
+          </div>
+
+          {/* Items in selected category */}
+          {selectedChecklistCategory !== null && (
+            <>
+              <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                {(settings.device_checklist?.categories?.[selectedChecklistCategory]?.items || []).map((item, index) => (
+                  <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                    <span className="flex-1 text-sm text-[#0f172a]">{item.label}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      item.type === 'yes_no'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {item.type === 'yes_no' ? 'Yes/No' : 'Working'}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteChecklistItem(selectedChecklistCategory, index)}
+                      className="text-[#ED2939] p-1"
+                    >
+                      <i className="fas fa-times text-xs"></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add new item to category */}
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Item name e.g. Front Camera"
+                  value={newChecklistItem.label}
+                  onChange={e => setNewChecklistItem(prev => ({ ...prev, label: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={newChecklistItem.type}
+                    onChange={e => setNewChecklistItem(prev => ({ ...prev, type: e.target.value }))}
+                    className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395] bg-white"
+                  >
+                    <option value="working_notworking">Working / Not Working</option>
+                    <option value="yes_no">Yes / No</option>
+                  </select>
+                  <button
+                    onClick={handleAddChecklistItem}
+                    className="bg-[#002395] text-white rounded-xl px-4 py-2 text-sm font-semibold"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             </>
           )}
