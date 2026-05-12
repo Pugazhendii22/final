@@ -44,11 +44,11 @@ const PageLoader = () => (
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser } = useAuth();
-  
+
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 
@@ -65,188 +65,188 @@ function App() {
                 <Route path="/rate/:token" element={<RatingPage />} />
                 <Route path="/scan/:labelNumber" element={<ScanResult />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/labels" 
-              element={
-                <ProtectedRoute>
-                  <LabelRegistryList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/scanner" 
-              element={
-                <ProtectedRoute>
-                  <ScannerPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/customers" 
-              element={
-                <ProtectedRoute>
-                  <CustomerList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/customers/:id" 
-              element={
-                <ProtectedRoute>
-                  <CustomerView />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/inventory/second-hand" 
-              element={
-                <ProtectedRoute>
-                  <SecondHandList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/inventory/second-hand/:id" 
-              element={
-                <ProtectedRoute>
-                  <SecondHandView />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/products" 
-              element={
-                <ProtectedRoute>
-                  <ProductList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/products/:id" 
-              element={
-                <ProtectedRoute>
-                  <ProductView />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/service" 
-              element={
-                <ProtectedRoute>
-                  <ServiceOrderList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/service/:id" 
-              element={
-                <ProtectedRoute>
-                  <ServiceOrderView />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/sales" 
-              element={
-                <ProtectedRoute>
-                  <SalesList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/sales/:id" 
-              element={
-                <ProtectedRoute>
-                  <SalesView />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/enquiries" 
-              element={
-                <ProtectedRoute>
-                  <EnquiryList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/enquiries/:id" 
-              element={
-                <ProtectedRoute>
-                  <EnquiryView />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/reports" 
-              element={
-                <ProtectedRoute>
-                  <ReportsPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/staff" 
-              element={
-                <ProtectedRoute>
-                  <StaffManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/tasks" 
-              element={
-                <ProtectedRoute>
-                  <TaskManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/ratings" 
-              element={
-                <ProtectedRoute>
-                  <RatingsList />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/settings" 
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/tasks" 
-              element={
-                <ProtectedRoute>
-                  <MyTasks />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/due-payments" 
-              element={
-                <ProtectedRoute>
-                  <DuePaymentsPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
-      </ErrorBoundary>
-      </Router>
-      <PWAInstallPrompt />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/labels"
+                  element={
+                    <ProtectedRoute>
+                      <LabelRegistryList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/scanner"
+                  element={
+                    <ProtectedRoute>
+                      <ScannerPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/customers"
+                  element={
+                    <ProtectedRoute>
+                      <CustomerList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/customers/:id"
+                  element={
+                    <ProtectedRoute>
+                      <CustomerView />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/inventory/second-hand"
+                  element={
+                    <ProtectedRoute>
+                      <SecondHandList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/inventory/second-hand/:id"
+                  element={
+                    <ProtectedRoute>
+                      <SecondHandView />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/products"
+                  element={
+                    <ProtectedRoute>
+                      <ProductList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/products/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ProductView />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/service"
+                  element={
+                    <ProtectedRoute>
+                      <ServiceOrderList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/service/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ServiceOrderView />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/sales"
+                  element={
+                    <ProtectedRoute>
+                      <SalesList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/sales/:id"
+                  element={
+                    <ProtectedRoute>
+                      <SalesView />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/enquiries"
+                  element={
+                    <ProtectedRoute>
+                      <EnquiryList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/enquiries/:id"
+                  element={
+                    <ProtectedRoute>
+                      <EnquiryView />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/reports"
+                  element={
+                    <ProtectedRoute>
+                      <ReportsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/staff"
+                  element={
+                    <ProtectedRoute>
+                      <StaffManagement />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/tasks"
+                  element={
+                    <ProtectedRoute>
+                      <TaskManagement />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/ratings"
+                  element={
+                    <ProtectedRoute>
+                      <RatingsList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <ProtectedRoute>
+                      <SettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tasks"
+                  element={
+                    <ProtectedRoute>
+                      <MyTasks />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/due-payments"
+                  element={
+                    <ProtectedRoute>
+                      <DuePaymentsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </Router>
+        <PWAInstallPrompt />
       </SettingsProvider>
     </AuthProvider>
   );
