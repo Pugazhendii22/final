@@ -113,6 +113,20 @@ const DEFAULT_SETTINGS = {
     instagram: "https://www.instagram.com/the_french_mobiles",
     whatsapp: "+91 99447 01436",
     warranty_text: "Mobile handset & Chargers are warranted for the period defined by the respective manufacturers. We are not giving warranty and does not hold out any warranty of product sold. Physical and liquid damages will not be covered under warranty terms.",
+    invoice_terms: [
+      "Goods once sold will not be taken back.",
+      "Warranty as per manufacturer terms only.",
+      "Physical and liquid damage not covered under warranty.",
+      "Please check all goods before leaving the shop.",
+      "The shop will not be responsible for any data loss."
+    ],
+    service_terms: [
+      "No warranty / guarantee for Aftermarket Spare Parts, especially for display components.",
+      "The shop will not take responsibility for orders/devices not collected within 30 days.",
+      "By agreeing, you allow our company to use your personal details such as your name, phone number, and IMEI number for Customer Support, Service Improvement, and Surveys, while keeping your data safe under Privacy Laws."
+    ],
+    logo_url: "",
+    watermark_text: "THE FRENCH MOBILES",
     user_notice: [
       "Please inspect your device carefully when collecting it from our service center.",
       "Physical and liquid damage will not be covered under warranty terms.",
@@ -204,7 +218,11 @@ export const SettingsProvider = ({ children }) => {
       docs.forEach((docSnap, i) => {
         const key = keys[i]
         if (docSnap.exists()) {
-          newSettings[key] = docSnap.data()
+          if (key === 'shop_details') {
+            newSettings[key] = { ...DEFAULT_SETTINGS.shop_details, ...docSnap.data() }
+          } else {
+            newSettings[key] = docSnap.data()
+          }
         } else {
           newSettings[key] = DEFAULT_SETTINGS[key]
           missingKeys.push(key)
@@ -266,7 +284,7 @@ export const SettingsProvider = ({ children }) => {
         loading,
         updateSetting,
         clearCache,
-        shopDetails: settings.shop_details || DEFAULT_SETTINGS.shop_details,
+        shopDetails: { ...DEFAULT_SETTINGS.shop_details, ...settings.shop_details },
         complaintTypes: settings.complaint_types?.items || [],
         preDeliveryChecklist: settings.pre_delivery_checklist?.items || [],
         brands: settings.brands?.items || [],

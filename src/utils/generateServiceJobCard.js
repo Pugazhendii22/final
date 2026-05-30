@@ -1,6 +1,22 @@
 export const generateServiceJobCard = (order, shopDetails) => {
   const shop = shopDetails || {}
 
+  const watermarkStyle = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 60px;
+    font-weight: 900;
+    color: rgba(0,35,149,0.06);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+    font-family: Arial, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+  `
+
   return `
     <!DOCTYPE html>
     <html>
@@ -15,247 +31,322 @@ export const generateServiceJobCard = (order, shopDetails) => {
           color: #000;
           background: #fff;
         }
-        @page {
-          size: A4 portrait;
-          margin: 8mm;
-        }
+        @page { size: A4 portrait; margin: 10mm; }
         .page {
-          width: 210mm;
-          min-height: 148mm;
-          padding: 0;
+          width: 190mm;
+          min-height: 277mm;
           margin: 0 auto;
-          background: #fff;
+          position: relative;
+          z-index: 1;
         }
+
+        /* HEADER */
         .header {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          border-bottom: 2px solid #000;
-          padding-bottom: 8px;
-          margin-bottom: 8px;
+          padding-bottom: 6px;
+          margin-bottom: 6px;
+          border-bottom: 3px solid #002395;
         }
-        .header-left { flex: 1; }
-        .header-center { flex: 1; text-align: center; }
-        .header-right { flex: 1; text-align: right; font-size: 10px; }
-        .doc-title { font-size: 18px; font-weight: bold; text-align: center; }
-        .shop-name { font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
-        .shop-info { font-size: 9px; line-height: 1.6; color: #333; margin-top: 2px; }
-        .order-no { font-size: 10px; font-weight: bold; }
-        .two-col { display: flex; gap: 0; border: 1px solid #000; margin-bottom: 6px; }
-        .col-left { flex: 1; padding: 8px; border-right: 1px solid #000; }
-        .col-right { flex: 1; padding: 8px; }
-        .section-title { font-size: 11px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 6px; }
-        .field-row { display: flex; margin-bottom: 4px; font-size: 10px; }
-        .field-label { font-weight: bold; min-width: 100px; flex-shrink: 0; }
-        .field-value { flex: 1; border-bottom: 1px solid #ccc; padding-left: 4px; min-height: 14px; }
-        .barcode-section { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
-        .barcode-img { height: 35px; }
-        .fault-solution { display: flex; gap: 0; border: 1px solid #000; margin-bottom: 6px; }
-        .fault-col { flex: 1; padding: 8px; border-right: 1px solid #000; }
-        .solution-col { flex: 1; padding: 8px; }
-        .content-text { font-size: 10px; line-height: 1.6; min-height: 40px; }
-        .accessories-list { font-size: 10px; line-height: 1.8; }
-        .notice-contact { display: flex; gap: 0; border: 1px solid #000; margin-bottom: 6px; }
-        .notice-col { flex: 1; padding: 8px; border-right: 1px solid #000; }
-        .contact-col { flex: 1; padding: 8px; }
-        .notice-item { font-size: 9px; line-height: 1.6; margin-bottom: 2px; }
-        .contact-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 9px; }
-        .contact-label { font-weight: bold; min-width: 70px; }
-        .signature-section { display: flex; gap: 0; border: 1px solid #000; }
-        .sig-col { flex: 1; padding: 8px; border-right: 1px solid #000; font-size: 9px; }
-        .sig-col:last-child { border-right: none; }
-        .sig-line { border-bottom: 1px solid #000; margin-top: 20px; margin-bottom: 4px; width: 80%; }
-        .shop-stamp { text-align: right; font-size: 10px; font-weight: bold; padding: 8px; flex: 1; }
-        .thank-you { text-align: center; font-size: 10px; padding: 6px; border: 1px solid #000; border-top: none; font-style: italic; }
-        .amount-box { border: 2px solid #000; padding: 6px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .amount-label { font-size: 12px; font-weight: bold; }
-        .amount-value { font-size: 14px; font-weight: bold; }
+        .header-left {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          flex: 1;
+        }
+        .logo-box {
+          width: 70px;
+          height: 70px;
+          border: 1px dashed #ccc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          font-size: 8px;
+          color: #ccc;
+          border-radius: 4px;
+        }
+        .logo-img {
+          width: 70px;
+          height: 70px;
+          object-fit: contain;
+        }
+        .shop-text { flex: 1; }
+        .shop-name {
+          font-size: 22px;
+          font-weight: 900;
+          color: #002395;
+          text-transform: uppercase;
+        }
+        .shop-hours {
+          font-size: 9px;
+          color: #666;
+          font-style: italic;
+          margin-top: 2px;
+        }
+        .header-right {
+          text-align: right;
+          flex-shrink: 0;
+        }
+        .doc-title {
+          font-size: 20px;
+          font-weight: 300;
+          color: #888;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        }
+        .order-no {
+          font-size: 10px;
+          color: #002395;
+          font-weight: bold;
+          margin-top: 4px;
+        }
+
+        /* FIELD ROWS */
+        .fields-section {
+          margin-bottom: 10px;
+        }
+        .field-row {
+          display: flex;
+          align-items: flex-start;
+          margin-bottom: 10px;
+          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: 6px;
+        }
+        .field-label {
+          font-size: 10px;
+          font-weight: bold;
+          color: #002395;
+          min-width: 140px;
+          flex-shrink: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          padding-top: 2px;
+        }
+        .field-value {
+          flex: 1;
+          font-size: 11px;
+          color: #000;
+          padding-left: 8px;
+          min-height: 16px;
+        }
+        .field-box {
+          flex: 1;
+          border: 1px dashed #ccc;
+          min-height: 50px;
+          padding: 6px;
+          margin-left: 8px;
+          border-radius: 4px;
+          font-size: 10px;
+          color: #333;
+        }
+        .field-hint {
+          font-size: 9px;
+          color: #999;
+          font-style: italic;
+          margin-top: 4px;
+          margin-left: 148px;
+        }
+
+        /* DIVIDER */
+        .divider {
+          border-top: 2px solid #002395;
+          margin: 12px 0;
+        }
+
+        /* TERMS */
+        .terms-section {
+          margin-top: 10px;
+        }
+        .terms-title {
+          font-size: 11px;
+          font-weight: bold;
+          color: #002395;
+          margin-bottom: 6px;
+          text-transform: uppercase;
+        }
+        .terms-item {
+          font-size: 9px;
+          line-height: 1.7;
+          color: #444;
+          margin-bottom: 3px;
+        }
+
+        /* SIGNATURE */
+        .signature-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-top: 20px;
+          padding-top: 10px;
+          border-top: 1px solid #ddd;
+        }
+        .sig-line {
+          border-bottom: 1px solid #000;
+          width: 180px;
+          margin-top: 30px;
+          margin-bottom: 4px;
+        }
+
+        .copy-text {
+          font-size: 9px;
+          color: #aaa;
+          font-style: italic;
+          text-align: right;
+          margin-top: 8px;
+        }
       </style>
     </head>
     <body>
-      <div class="page">
 
-        <div class="header">
-          <div class="header-left">
-            <div class="shop-name">${shop.name || 'THE FRENCH MOBILES'}</div>
-            <div class="shop-info">
-              Business hours: ${shop.hours || '10:00 AM - 9:00 PM'}<br>
-              Address: ${shop.address || '225, Thiruvalluvar Salai, Puducherry - 605013'}<br>
-              Contact: ${shop.phone || '+91 99447 01436'}
-            </div>
-            ${shop.gstin ? `<div style="font-size:9px;margin-top:3px;">GSTIN: ${shop.gstin}</div>` : ''}
-          </div>
-          <div class="header-center">
-            <div class="doc-title">Job Card</div>
-            <div style="font-size:10px;color:#555;margin-top:2px;">Service Receipt</div>
-          </div>
-          <div class="header-right">
-            <div class="order-no">NO: ${order.orderNumber}</div>
-            <div style="margin-top:4px;font-size:9px;">
-              Date: ${order.receivedAt?.toDate?.()?.toLocaleDateString('en-IN') || new Date().toLocaleDateString('en-IN')}
-            </div>
-            <div style="margin-top:4px;font-size:9px;">
-              Time: ${order.receivedAt?.toDate?.()?.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) || new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}
-            </div>
-          </div>
-        </div>
-
-        <div class="two-col">
-          <div class="col-left">
-            <div class="section-title">Service Center Info</div>
-            <div class="field-row">
-              <span class="field-label">Customer Name</span>
-              <span class="field-value">${order.customerName || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Mobile</span>
-              <span class="field-value">${order.customerPhone || ''}</span>
-            </div>
-            ${order.alternatePhone ? `
-            <div class="field-row">
-              <span class="field-label">Alt. Mobile</span>
-              <span class="field-value">${order.alternatePhone}</span>
-            </div>` : ''}
-            <div class="barcode-section">
-              <div style="font-size:9px;color:#555;">Order Barcode:</div>
-              ${order.assignedLabelNumber ? `
-                <svg id="barcode-svg"></svg>
-                <div style="font-size:9px;">#${order.assignedLabelNumber}</div>
-              ` : `<div style="font-size:9px;color:#999;">No label assigned</div>`}
-            </div>
-          </div>
-          <div class="col-right">
-            <div class="section-title">Device Info</div>
-            <div class="field-row">
-              <span class="field-label">Brand / Model</span>
-              <span class="field-value">${order.brand || ''} ${order.model || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Colour</span>
-              <span class="field-value">${order.colour || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">IMEI 1</span>
-              <span class="field-value">${order.imei1 || ''}</span>
-            </div>
-            ${order.imei2 ? `
-            <div class="field-row">
-              <span class="field-label">IMEI 2</span>
-              <span class="field-value">${order.imei2}</span>
-            </div>` : ''}
-            <div class="field-row">
-              <span class="field-label">Lock Type</span>
-              <span class="field-value">${order.lockType || 'None'}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Technician</span>
-              <span class="field-value">${order.technicianName || ''}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="fault-solution">
-          <div class="fault-col">
-            <div class="section-title">Fault / Issues Reported</div>
-            <div class="content-text">
-              ${(order.complaintTypes || []).map(c => `\u2022 ${c}`).join('<br>')}
-              ${order.otherComplaint ? `<br>\u2022 ${order.otherComplaint}` : ''}
-              ${order.problemDetails ? `<br><br><strong>Details:</strong> ${order.problemDetails}` : ''}
-            </div>
-          </div>
-          <div class="solution-col">
-            <div class="section-title">Accessories Collected</div>
-            <div class="accessories-list">
-              ${(order.accessoriesCollected || order.accessories || []).map(a => `\u2022 ${a}`).join('<br>')}
-              ${(!order.accessoriesCollected && !order.accessories) || ((order.accessoriesCollected || order.accessories || []).length === 0) ? 'None' : ''}
-            </div>
-            <div style="margin-top:10px;">
-              <div class="section-title">Estimated Amount</div>
-              <div style="font-size:14px;font-weight:bold;margin-top:4px;">
-                Rs. ${order.estimatedPrice || 0}
-              </div>
-              ${order.advancePaid > 0 ? `
-              <div style="font-size:10px;margin-top:2px;">
-                Advance Paid: Rs. ${order.advancePaid}
-              </div>` : ''}
-            </div>
-          </div>
-        </div>
-
-        <div class="notice-contact">
-          <div class="notice-col">
-            <div class="section-title">User Notice</div>
-            ${(shop.user_notice || [
-              'Please inspect your device carefully when collecting it.',
-              'Physical and liquid damage will not be covered under warranty.',
-              'Please keep this receipt and present it when collecting your device.',
-              'We are not responsible for any data loss during repair.'
-            ]).map((notice, i) => `
-              <div class="notice-item">${i+1}. ${notice}</div>
-            `).join('')}
-          </div>
-          <div class="contact-col">
-            <div class="section-title">Contact Us</div>
-            <div class="contact-item">
-              <span style="font-size:12px;">\uD83D\uDCDE</span>
-              <span class="contact-label">Phone</span>
-              <span>${shop.phone || '+91 99447 01436'}</span>
-            </div>
-            <div class="contact-item">
-              <span style="font-size:12px;">\uD83D\uDCAC</span>
-              <span class="contact-label">WhatsApp</span>
-              <span>${shop.whatsapp || '+91 99447 01436'}</span>
-            </div>
-            <div class="contact-item">
-              <span style="font-size:12px;">\uD83D\uDCD8</span>
-              <span class="contact-label">Facebook</span>
-              <span style="font-size:8px;">${shop.facebook || ''}</span>
-            </div>
-            <div class="contact-item">
-              <span style="font-size:12px;">\uD83D\uDCF7</span>
-              <span class="contact-label">Instagram</span>
-              <span style="font-size:8px;">${shop.instagram || ''}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="signature-section">
-          <div class="sig-col" style="flex:2">
-            <div>Customer Signature:</div>
-            <div class="sig-line"></div>
-            <div style="font-size:9px;">Goods received in good condition</div>
-          </div>
-          <div class="sig-col">
-            <div>${shop.technician_label || 'Repair Engineer'}:</div>
-            <div style="font-size:10px;font-weight:bold;margin-top:4px;">${order.technicianName || ''}</div>
-            <div class="sig-line"></div>
-          </div>
-          <div class="shop-stamp">
-            <div>${shop.name || 'THE FRENCH MOBILES'}</div>
-            <div style="font-size:9px;font-weight:normal;margin-top:2px;">Authorised Signature</div>
-            <div style="width:60px;height:60px;border:1px solid #ccc;border-radius:50%;margin:4px 0 0 auto;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ccc;">SEAL</div>
-          </div>
-        </div>
-
-        <div class="thank-you">
-          ${shop.footer_message || 'Thank you for choosing The French Mobiles!'}
-        </div>
-
+      <!-- WATERMARK -->
+      <div style="${watermarkStyle}">
+        ${shop.watermark_text || 'THE FRENCH MOBILES'}
       </div>
 
-      ${order.assignedLabelNumber ? `
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-      <script>
-        window.onload = function() {
-          JsBarcode("#barcode-svg", "${order.assignedLabelNumber}", {
-            format: "CODE128",
-            width: 1.5,
-            height: 30,
-            displayValue: false,
-            margin: 0
-          })
-        }
-      </script>` : ''}
+      <div class="page">
+
+        <!-- HEADER -->
+        <div class="header">
+          <div class="header-left">
+            ${shop.logo_url
+              ? `<img src="${shop.logo_url}" class="logo-img" alt="Logo" />`
+              : `<div class="logo-box">LOGO</div>`
+            }
+            <div class="shop-text">
+              <div class="shop-name">${shop.name || 'THE FRENCH MOBILES'}</div>
+              <div class="shop-hours">Business Hours: ${shop.hours || '10:00 AM - 9:00 PM'}</div>
+              <div style="font-size:9px;color:#555;margin-top:2px;">${shop.address || '225, Thiruvalluvar Salai, Puducherry - 605013'}</div>
+              <div style="font-size:9px;color:#555;">Ph: ${shop.phone || '+91 99447 01436'}</div>
+            </div>
+          </div>
+          <div class="header-right">
+            <div class="doc-title">Receipt / Job Sheet</div>
+            <div class="order-no">Order: ${order.orderNumber}</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">
+              ${order.receivedAt?.toDate?.()?.toLocaleString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) || new Date().toLocaleString('en-IN')}
+            </div>
+          </div>
+        </div>
+
+        <!-- FIELDS -->
+        <div class="fields-section">
+
+          <div class="field-row">
+            <span class="field-label">Customer Name:</span>
+            <span class="field-value">${order.customerName || ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Address:</span>
+            <span class="field-value"></span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Contact Number:</span>
+            <span class="field-value">${order.customerPhone || ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Alternate Number:</span>
+            <span class="field-value">${order.alternatePhone || ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Date / Time:</span>
+            <span class="field-value">
+              ${order.receivedAt?.toDate?.()?.toLocaleString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) || new Date().toLocaleString('en-IN')}
+            </span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Product Info:</span>
+            <span class="field-value">${order.brand || ''} ${order.model || ''} ${order.colour ? '(' + order.colour + ')' : ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Product IMEI:</span>
+            <span class="field-value">
+              ${order.imei1 || ''}
+              ${order.imei2 ? ' / ' + order.imei2 : ''}
+            </span>
+          </div>
+
+          <div class="field-row" style="align-items:flex-start;">
+            <span class="field-label" style="padding-top:4px;">Condition of Phone:</span>
+            <div class="field-box">
+              ${order.problemDetails || ''}
+            </div>
+          </div>
+          <div class="field-hint">* Please describe condition in the box above.</div>
+
+          <div class="field-row" style="margin-top:10px;">
+            <span class="field-label">Nature of Complaint:</span>
+            <span class="field-value">
+              ${(order.complaintTypes || []).join(', ')}
+              ${order.otherComplaint ? (order.complaintTypes?.length ? ', ' : '') + order.otherComplaint : ''}
+            </span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Technician Name:</span>
+            <span class="field-value">${order.technicianName || ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Estimated Amount:</span>
+            <span class="field-value" style="font-weight:bold;font-size:13px;">
+              Rs. ${order.estimatedPrice || 0}
+              ${order.advancePaid > 0 ? `<span style="font-size:10px;font-weight:normal;color:#555;margin-left:10px;">(Advance: Rs. ${order.advancePaid})</span>` : ''}
+            </span>
+          </div>
+
+          ${order.lockType && order.lockType !== 'None' ? `
+          <div class="field-row">
+            <span class="field-label">Lock Type:</span>
+            <span class="field-value">${order.lockType}</span>
+          </div>` : ''}
+
+          ${order.accessoriesCollected?.length > 0 ? `
+          <div class="field-row">
+            <span class="field-label">Accessories:</span>
+            <span class="field-value">${order.accessoriesCollected.join(', ')}</span>
+          </div>` : ''}
+
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- TERMS -->
+        <div class="terms-section">
+          <div class="terms-title">Terms, Conditions & Privacy Policy</div>
+          ${(shop.service_terms || [
+            'No warranty / guarantee for Aftermarket Spare Parts, especially for display components.',
+            'The shop will not take responsibility for orders/devices not collected within 30 days.',
+            'By agreeing, you allow our company to use your personal details such as your name, phone number, and IMEI number for Customer Support, Service Improvement, and Surveys, while keeping your data safe under Privacy Laws.'
+          ]).map((term, i) => `
+            <div class="terms-item">• ${term}</div>
+          `).join('')}
+        </div>
+
+        <!-- SIGNATURES -->
+        <div class="signature-section">
+          <div>
+            <div style="font-size:10px;font-weight:bold;">Customer Signature:</div>
+            <div class="sig-line"></div>
+            <div style="font-size:9px;color:#555;">I agree to the above terms and conditions</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;font-weight:bold;">${shop.technician_label || 'Technician'}:</div>
+            <div style="font-size:11px;font-weight:bold;margin-top:4px;">${order.technicianName || ''}</div>
+            <div class="sig-line" style="margin-left:auto;"></div>
+          </div>
+        </div>
+
+        <div class="copy-text">Customer Copy</div>
+
+      </div>
     </body>
     </html>
   `

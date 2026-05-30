@@ -4,6 +4,22 @@ export const generateServiceFinalBill = (order, shopDetails) => {
   const advance = order.advancePaid || 0
   const balance = finalAmount - advance
 
+  const watermarkStyle = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 60px;
+    font-weight: 900;
+    color: rgba(0,35,149,0.06);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+    font-family: Arial, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+  `
+
   return `
     <!DOCTYPE html>
     <html>
@@ -12,108 +28,313 @@ export const generateServiceFinalBill = (order, shopDetails) => {
       <title>Final Bill - ${order.orderNumber}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; }
-        @page { size: A4 portrait; margin: 8mm; }
-        .page { width: 210mm; min-height: 148mm; padding: 0; margin: 0 auto; background: #fff; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
-        .header-left { flex: 1; }
-        .header-center { flex: 1; text-align: center; }
-        .header-right { flex: 1; text-align: right; font-size: 10px; }
-        .doc-title { font-size: 18px; font-weight: bold; text-align: center; }
-        .shop-name { font-size: 16px; font-weight: 900; text-transform: uppercase; }
-        .shop-info { font-size: 9px; line-height: 1.6; color: #333; margin-top: 2px; }
-        .two-col { display: flex; border: 1px solid #000; margin-bottom: 6px; }
-        .col-left { flex: 1; padding: 8px; border-right: 1px solid #000; }
-        .col-right { flex: 1; padding: 8px; }
-        .section-title { font-size: 11px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 6px; }
-        .field-row { display: flex; margin-bottom: 4px; font-size: 10px; }
-        .field-label { font-weight: bold; min-width: 100px; flex-shrink: 0; }
-        .field-value { flex: 1; border-bottom: 1px solid #ccc; padding-left: 4px; min-height: 14px; }
-        .fault-solution { display: flex; border: 1px solid #000; margin-bottom: 6px; }
-        .fault-col { flex: 1; padding: 8px; border-right: 1px solid #000; }
-        .solution-col { flex: 1; padding: 8px; }
-        .content-text { font-size: 10px; line-height: 1.6; min-height: 30px; }
-        .notice-contact { display: flex; border: 1px solid #000; margin-bottom: 6px; }
-        .notice-col { flex: 1; padding: 8px; border-right: 1px solid #000; }
-        .contact-col { flex: 1; padding: 8px; }
-        .notice-item { font-size: 9px; line-height: 1.6; margin-bottom: 2px; }
-        .contact-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 9px; }
-        .contact-label { font-weight: bold; min-width: 70px; }
-        .signature-section { display: flex; border: 1px solid #000; }
-        .sig-col { flex: 1; padding: 8px; border-right: 1px solid #000; font-size: 9px; }
-        .sig-col:last-child { border-right: none; }
-        .sig-line { border-bottom: 1px solid #000; margin-top: 20px; margin-bottom: 4px; width: 80%; }
-        .shop-stamp { text-align: right; font-size: 10px; font-weight: bold; padding: 8px; flex: 1; }
-        .thank-you { text-align: center; font-size: 10px; padding: 6px; border: 1px solid #000; border-top: none; font-style: italic; }
-        .payment-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-        .payment-table td { border: 1px solid #000; padding: 5px 8px; font-size: 10px; }
-        .payment-table .total-row td { font-weight: bold; font-size: 12px; }
-        .payment-table .balance-row td { font-weight: bold; font-size: 11px; color: ${balance > 0 ? 'red' : 'green'}; }
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 11px;
+          color: #000;
+          background: #fff;
+        }
+        @page { size: A4 portrait; margin: 10mm; }
+        .page {
+          width: 190mm;
+          min-height: 277mm;
+          margin: 0 auto;
+          position: relative;
+          z-index: 1;
+        }
+
+        /* HEADER */
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding-bottom: 6px;
+          margin-bottom: 6px;
+          border-bottom: 3px solid #002395;
+        }
+        .header-left {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          flex: 1;
+        }
+        .logo-box {
+          width: 70px;
+          height: 70px;
+          border: 1px dashed #ccc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          font-size: 8px;
+          color: #ccc;
+          border-radius: 4px;
+        }
+        .logo-img {
+          width: 70px;
+          height: 70px;
+          object-fit: contain;
+        }
+        .shop-text { flex: 1; }
+        .shop-name {
+          font-size: 22px;
+          font-weight: 900;
+          color: #002395;
+          text-transform: uppercase;
+        }
+        .shop-hours {
+          font-size: 9px;
+          color: #666;
+          font-style: italic;
+          margin-top: 2px;
+        }
+        .header-right {
+          text-align: right;
+          flex-shrink: 0;
+        }
+        .doc-title {
+          font-size: 20px;
+          font-weight: bold;
+          color: #002395;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        }
+        .order-no {
+          font-size: 10px;
+          color: #002395;
+          font-weight: bold;
+          margin-top: 4px;
+        }
+
+        /* FIELD ROWS */
+        .fields-section {
+          margin-bottom: 10px;
+        }
+        .field-row {
+          display: flex;
+          align-items: flex-start;
+          margin-bottom: 10px;
+          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: 6px;
+        }
+        .field-label {
+          font-size: 10px;
+          font-weight: bold;
+          color: #002395;
+          min-width: 140px;
+          flex-shrink: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          padding-top: 2px;
+        }
+        .field-value {
+          flex: 1;
+          font-size: 11px;
+          color: #000;
+          padding-left: 8px;
+          min-height: 16px;
+        }
+        .field-box {
+          flex: 1;
+          border: 1px dashed #ccc;
+          min-height: 50px;
+          padding: 6px;
+          margin-left: 8px;
+          border-radius: 4px;
+          font-size: 10px;
+          color: #333;
+        }
+
+        /* FAULT / SOLUTION SECTION */
+        .fault-solution {
+          display: flex;
+          gap: 0;
+          border: 1px solid #ddd;
+          margin-bottom: 10px;
+        }
+        .fault-col {
+          flex: 1;
+          padding: 8px 10px;
+          border-right: 1px solid #ddd;
+        }
+        .solution-col {
+          flex: 1;
+          padding: 8px 10px;
+        }
+        .section-title {
+          font-size: 10px;
+          font-weight: bold;
+          color: #002395;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 6px;
+          border-bottom: 1px solid #eee;
+          padding-bottom: 3px;
+        }
+        .content-text {
+          font-size: 10px;
+          line-height: 1.6;
+          color: #333;
+          min-height: 40px;
+        }
+
+        /* PAYMENT SUMMARY */
+        .payment-summary-box {
+          border: 1px solid #ddd;
+          margin-bottom: 10px;
+        }
+        .payment-summary-title {
+          background: #002395;
+          color: white;
+          padding: 6px 10px;
+          font-size: 10px;
+          font-weight: bold;
+          text-transform: uppercase;
+        }
+        .payment-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .payment-table td {
+          padding: 6px 10px;
+          font-size: 10px;
+          border-bottom: 1px solid #eee;
+        }
+        .payment-table tr:last-child td {
+          border-bottom: none;
+        }
+        .payment-table .total-row td {
+          font-weight: bold;
+          font-size: 11px;
+        }
+        .payment-table .balance-row td {
+          font-weight: bold;
+          font-size: 12px;
+          background: #f8fafc;
+        }
+
+        /* WARRANTY */
+        .warranty-section {
+          border: 1px solid #ddd;
+          padding: 8px 10px;
+          margin-bottom: 10px;
+        }
+        .warranty-title {
+          font-size: 10px;
+          font-weight: bold;
+          color: #002395;
+          border-bottom: 1px solid #eee;
+          padding-bottom: 4px;
+          margin-bottom: 6px;
+          text-transform: uppercase;
+        }
+        .warranty-text {
+          font-size: 9px;
+          line-height: 1.6;
+          color: #444;
+        }
+
+        /* SIGNATURES */
+        .signature-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-top: 20px;
+          padding-top: 10px;
+          border-top: 1px solid #ddd;
+        }
+        .sig-line {
+          border-bottom: 1px solid #000;
+          width: 180px;
+          margin-top: 30px;
+          margin-bottom: 4px;
+        }
+
+        .copy-text {
+          font-size: 9px;
+          color: #aaa;
+          font-style: italic;
+          text-align: right;
+          margin-top: 8px;
+        }
       </style>
     </head>
     <body>
+
+      <!-- WATERMARK -->
+      <div style="${watermarkStyle}">
+        ${shop.watermark_text || 'THE FRENCH MOBILES'}
+      </div>
+
       <div class="page">
 
+        <!-- HEADER -->
         <div class="header">
           <div class="header-left">
-            <div class="shop-name">${shop.name || 'THE FRENCH MOBILES'}</div>
-            <div class="shop-info">
-              Business hours: ${shop.hours || '10:00 AM - 9:00 PM'}<br>
-              Address: ${shop.address || '225, Thiruvalluvar Salai, Puducherry - 605013'}<br>
-              Contact: ${shop.phone || '+91 99447 01436'}
+            ${shop.logo_url
+              ? `<img src="${shop.logo_url}" class="logo-img" alt="Logo" />`
+              : `<div class="logo-box">LOGO</div>`
+            }
+            <div class="shop-text">
+              <div class="shop-name">${shop.name || 'THE FRENCH MOBILES'}</div>
+              <div class="shop-hours">Business Hours: ${shop.hours || '10:00 AM - 9:00 PM'}</div>
+              <div style="font-size:9px;color:#555;margin-top:2px;">${shop.address || '225, Thiruvalluvar Salai, Puducherry - 605013'}</div>
+              <div style="font-size:9px;color:#555;">Ph: ${shop.phone || '+91 99447 01436'}</div>
             </div>
-            ${shop.gstin ? `<div style="font-size:9px;margin-top:3px;">GSTIN: ${shop.gstin}</div>` : ''}
-          </div>
-          <div class="header-center">
-            <div class="doc-title">Service Invoice</div>
-            <div style="font-size:10px;color:#555;margin-top:2px;">Final Bill</div>
           </div>
           <div class="header-right">
-            <div style="font-weight:bold;font-size:10px;">NO: ${order.orderNumber}</div>
-            <div style="font-size:9px;margin-top:4px;">
-              Received: ${order.receivedAt?.toDate?.()?.toLocaleDateString('en-IN') || ''}
-            </div>
-            <div style="font-size:9px;margin-top:2px;">
-              Completed: ${order.actualCompletedAt?.toDate?.()?.toLocaleDateString('en-IN') || new Date().toLocaleDateString('en-IN')}
+            <div class="doc-title">FINAL SERVICE BILL</div>
+            <div class="order-no">Order: ${order.orderNumber}</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">
+              ${order.receivedAt?.toDate?.()?.toLocaleString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) || new Date().toLocaleString('en-IN')}
             </div>
           </div>
         </div>
 
-        <div class="two-col">
-          <div class="col-left">
-            <div class="section-title">Customer Info</div>
-            <div class="field-row">
-              <span class="field-label">Name</span>
-              <span class="field-value">${order.customerName || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Mobile</span>
-              <span class="field-value">${order.customerPhone || ''}</span>
-            </div>
+        <!-- FIELDS -->
+        <div class="fields-section">
+
+          <div class="field-row">
+            <span class="field-label">Customer Name:</span>
+            <span class="field-value">${order.customerName || ''}</span>
           </div>
-          <div class="col-right">
-            <div class="section-title">Device Info</div>
-            <div class="field-row">
-              <span class="field-label">Brand / Model</span>
-              <span class="field-value">${order.brand || ''} ${order.model || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">IMEI</span>
-              <span class="field-value">${order.imei1 || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Technician</span>
-              <span class="field-value">${order.technicianName || ''}</span>
-            </div>
+
+          <div class="field-row">
+            <span class="field-label">Contact Number:</span>
+            <span class="field-value">${order.customerPhone || ''}</span>
           </div>
+
+          <div class="field-row">
+            <span class="field-label">Product Info:</span>
+            <span class="field-value">${order.brand || ''} ${order.model || ''} ${order.colour ? '(' + order.colour + ')' : ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Product IMEI:</span>
+            <span class="field-value">${order.imei1 || ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Technician Name:</span>
+            <span class="field-value">${order.technicianName || ''}</span>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Completion Date:</span>
+            <span class="field-value">
+              ${order.actualCompletedAt?.toDate?.()?.toLocaleString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) || new Date().toLocaleString('en-IN')}
+            </span>
+          </div>
+
         </div>
 
+        <!-- FAULT & SOLUTION -->
         <div class="fault-solution">
           <div class="fault-col">
             <div class="section-title">Issues Reported</div>
             <div class="content-text">
-              ${(order.complaintTypes || []).map(c => `\u2022 ${c}`).join('<br>')}
-              ${order.otherComplaint ? `<br>\u2022 ${order.otherComplaint}` : ''}
+              ${(order.complaintTypes || []).map(c => `• ${c}`).join('<br>')}
+              ${order.otherComplaint ? `<br>• ${order.otherComplaint}` : ''}
             </div>
           </div>
           <div class="solution-col">
@@ -124,100 +345,67 @@ export const generateServiceFinalBill = (order, shopDetails) => {
           </div>
         </div>
 
-        <div style="border: 1px solid #000; margin-bottom: 6px;">
-          <div style="padding: 6px 8px; border-bottom: 1px solid #000; font-weight: bold; font-size: 11px;">
-            Payment Summary
-          </div>
-          <table class="payment-table" style="border: none; margin: 0;">
+        <!-- PAYMENT SUMMARY -->
+        <div class="payment-summary-box">
+          <div class="payment-summary-title">Payment Summary</div>
+          <table class="payment-table">
             <tr>
-              <td style="border-top:none;border-left:none;">Service Charge</td>
-              <td style="border-top:none;border-right:none;text-align:right;">Rs. ${order.estimatedPrice || 0}</td>
+              <td>Service Charge</td>
+              <td style="text-align:right;">Rs. ${(order.estimatedPrice || 0).toLocaleString('en-IN')}</td>
             </tr>
             ${order.rawMaterialCost > 0 ? `
             <tr>
-              <td style="border-left:none;">Parts / Material Cost</td>
-              <td style="border-right:none;text-align:right;">Rs. ${order.rawMaterialCost}</td>
+              <td>Parts / Material Cost</td>
+              <td style="text-align:right;">Rs. ${Number(order.rawMaterialCost).toLocaleString('en-IN')}</td>
             </tr>` : ''}
             ${order.outsideLabourCost > 0 ? `
             <tr>
-              <td style="border-left:none;">Outside Labour</td>
-              <td style="border-right:none;text-align:right;">Rs. ${order.outsideLabourCost}</td>
+              <td>Outside Labour</td>
+              <td style="text-align:right;">Rs. ${Number(order.outsideLabourCost).toLocaleString('en-IN')}</td>
             </tr>` : ''}
             <tr class="total-row">
-              <td style="border-left:none;">Total Amount</td>
-              <td style="border-right:none;text-align:right;">Rs. ${finalAmount}</td>
+              <td>Total Amount</td>
+              <td style="text-align:right;">Rs. ${finalAmount.toLocaleString('en-IN')}</td>
             </tr>
             ${advance > 0 ? `
             <tr>
-              <td style="border-left:none;">Advance Paid</td>
-              <td style="border-right:none;text-align:right;color:green;">- Rs. ${advance}</td>
+              <td>Advance Paid</td>
+              <td style="text-align:right;color:green;">- Rs. ${advance.toLocaleString('en-IN')}</td>
             </tr>` : ''}
             <tr class="balance-row">
-              <td style="border-left:none;border-bottom:none;">
-                ${balance > 0 ? 'Balance Due' : 'Fully Paid'}
+              <td style="font-weight:bold;">
+                ${balance > 0 ? 'Balance Due' : 'Status'}
               </td>
-              <td style="border-right:none;border-bottom:none;text-align:right;">
-                ${balance > 0 ? `Rs. ${balance}` : '\u2713 PAID'}
+              <td style="text-align:right;font-weight:bold;color:${balance > 0 ? '#ED2939' : '#16a34a'};">
+                ${balance > 0 ? `Rs. ${balance.toLocaleString('en-IN')}` : '✓ FULLY PAID'}
               </td>
             </tr>
           </table>
         </div>
 
-        <div style="border: 1px solid #000; padding: 6px 8px; margin-bottom: 6px; font-size: 9px;">
-          <strong>Warranty: </strong>${shop.warranty_text || 'Physical and liquid damages will not be covered under warranty terms.'}
-        </div>
-
-        <div class="notice-contact">
-          <div class="notice-col">
-            <div class="section-title">User Notice</div>
-            ${(shop.user_notice || [
-              'Please inspect your device carefully when collecting.',
-              'Physical and liquid damage not covered under warranty.',
-              'Keep this invoice for future reference.'
-            ]).map((n, i) => `<div class="notice-item">${i+1}. ${n}</div>`).join('')}
-          </div>
-          <div class="contact-col">
-            <div class="section-title">Contact Us</div>
-            <div class="contact-item">
-              <span>\uD83D\uDCDE</span><span class="contact-label">Phone</span>
-              <span>${shop.phone || ''}</span>
-            </div>
-            <div class="contact-item">
-              <span>\uD83D\uDCAC</span><span class="contact-label">WhatsApp</span>
-              <span>${shop.whatsapp || ''}</span>
-            </div>
-            <div class="contact-item">
-              <span>\uD83D\uDCD8</span><span class="contact-label">Facebook</span>
-              <span style="font-size:8px;">${shop.facebook || ''}</span>
-            </div>
-            <div class="contact-item">
-              <span>\uD83D\uDCF7</span><span class="contact-label">Instagram</span>
-              <span style="font-size:8px;">${shop.instagram || ''}</span>
-            </div>
+        <!-- WARRANTY -->
+        <div class="warranty-section">
+          <div class="warranty-title">WARRANTY TERMS & CONDITIONS</div>
+          <div class="warranty-text">
+            ${shop.warranty_text || 'Mobile handset & Chargers are warranted for the period defined by the respective manufacturers. We are not giving warranty and does not hold out any warranty of product sold. Physical and liquid damages will not be covered under warranty terms.'}
           </div>
         </div>
 
+        <!-- SIGNATURES -->
         <div class="signature-section">
-          <div class="sig-col" style="flex:2">
-            <div>Customer Signature:</div>
+          <div>
+            <div style="font-size:10px;font-weight:bold;">Customer Signature:</div>
             <div class="sig-line"></div>
-            <div style="font-size:9px;">Goods received in good condition</div>
+            <div style="font-size:9px;color:#555;">I agree to the above terms and conditions</div>
           </div>
-          <div class="sig-col">
-            <div>${shop.technician_label || 'Repair Engineer'}:</div>
-            <div style="font-size:10px;font-weight:bold;margin-top:4px;">${order.technicianName || ''}</div>
-            <div class="sig-line"></div>
-          </div>
-          <div class="shop-stamp">
-            <div>${shop.name || 'THE FRENCH MOBILES'}</div>
-            <div style="font-size:9px;font-weight:normal;margin-top:2px;">Authorised Signature</div>
-            <div style="width:60px;height:60px;border:1px solid #ccc;border-radius:50%;margin:4px 0 0 auto;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ccc;">SEAL</div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;font-weight:bold;">${shop.technician_label || 'Technician'}:</div>
+            <div style="font-size:11px;font-weight:bold;margin-top:4px;">${order.technicianName || ''}</div>
+            <div class="sig-line" style="margin-left:auto;"></div>
           </div>
         </div>
 
-        <div class="thank-you">
-          ${shop.footer_message || 'Thank you for choosing The French Mobiles!'}
-        </div>
+        <div class="copy-text">Customer Copy</div>
 
       </div>
     </body>

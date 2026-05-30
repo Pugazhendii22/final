@@ -4,12 +4,14 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { generateInvoiceHTML } from '../../utils/generateInvoiceHTML';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/common/Layout';
 
 const SalesView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { shopDetails } = useSettings();
+  const { currentUser, userDisplayName } = useAuth();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
@@ -41,7 +43,7 @@ const SalesView = () => {
       const freshSnap = await getDoc(doc(db, 'sales', id));
       const freshData = freshSnap.exists() ? { id: freshSnap.id, ...freshSnap.data() } : sale;
 
-      const invoiceHTML = generateInvoiceHTML(freshData, shopDetails);
+      const invoiceHTML = generateInvoiceHTML(freshData, shopDetails, userDisplayName || currentUser?.email);
 
       const existing = document.getElementById('invoice-print-overlay');
       if (existing) existing.remove();

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useSettings } from '../../context/SettingsContext'
+import { uploadImageToCloudinary } from '../../utils/uploadImage'
 
 const sections = [
   { key: 'complaint_types', label: 'Complaint Types', icon: 'fa-tools', color: '#ED2939' },
@@ -15,7 +16,7 @@ const sections = [
 const SettingsPage = () => {
   const navigate = useNavigate()
   const { currentUser, userRole } = useAuth()
-  const { settings, updateSetting, clearCache } = useSettings()
+  const { settings, updateSetting, clearCache, shopDetails } = useSettings()
   const [newItemText, setNewItemText] = useState({})
   const [editModal, setEditModal] = useState({ open: false, key: '', index: -1, value: '' })
   const [selectedModelBrand, setSelectedModelBrand] = useState('')
@@ -25,7 +26,7 @@ const SettingsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('Display')
   const [customCategories, setCustomCategories] = useState([])
   const [newChecklistItem, setNewChecklistItem] = useState({ label: '', type: 'working_notworking' })
-  const [shopForm, setShopForm] = useState(settings.shop_details || {
+  const [shopForm, setShopForm] = useState(shopDetails || {
     name: "THE FRENCH MOBILES",
     address: "225, Thiruvalluvar Salai, Iyyanar Nagar, Raja Nagar, Pudupalaiyam, Puducherry - 605013",
     phone: "+91 99447 01436",
@@ -35,6 +36,20 @@ const SettingsPage = () => {
     instagram: "https://www.instagram.com/the_french_mobiles",
     whatsapp: "+91 99447 01436",
     warranty_text: "Mobile handset & Chargers are warranted for the period defined by the respective manufacturers. We are not giving warranty and does not hold out any warranty of product sold. Physical and liquid damages will not be covered under warranty terms.",
+    invoice_terms: [
+      "Goods once sold will not be taken back.",
+      "Warranty as per manufacturer terms only.",
+      "Physical and liquid damage not covered under warranty.",
+      "Please check all goods before leaving the shop.",
+      "The shop will not be responsible for any data loss."
+    ],
+    service_terms: [
+      "No warranty / guarantee for Aftermarket Spare Parts, especially for display components.",
+      "The shop will not take responsibility for orders/devices not collected within 30 days.",
+      "By agreeing, you allow our company to use your personal details such as your name, phone number, and IMEI number for Customer Support, Service Improvement, and Surveys, while keeping your data safe under Privacy Laws."
+    ],
+    logo_url: "",
+    watermark_text: "THE FRENCH MOBILES",
     user_notice: [
       "Please inspect your device carefully when collecting it from our service center.",
       "Physical and liquid damage will not be covered under warranty terms.",
@@ -46,14 +61,50 @@ const SettingsPage = () => {
   })
 
   useEffect(() => {
-    if (settings.shop_details) {
-      setShopForm(settings.shop_details)
+    if (shopDetails) {
+      setShopForm(shopDetails)
     }
-  }, [settings.shop_details])
+  }, [shopDetails])
 
   const handleSaveShopDetails = async () => {
     await updateSetting('shop_details', shopForm)
     alert('Shop details saved!')
+  }
+
+  const handleAddInvoiceTerm = async () => {
+    const text = newItemText['invoice_terms']?.trim()
+    if (!text) return
+    const updated = [...(shopForm.invoice_terms || []), text]
+    const updatedShopForm = { ...shopForm, invoice_terms: updated }
+    setShopForm(updatedShopForm)
+    await updateSetting('shop_details', updatedShopForm)
+    setNewItemText(prev => ({ ...prev, invoice_terms: '' }))
+  }
+
+  const handleDeleteInvoiceTerm = async (index) => {
+    const updated = [...(shopForm.invoice_terms || [])]
+    updated.splice(index, 1)
+    const updatedShopForm = { ...shopForm, invoice_terms: updated }
+    setShopForm(updatedShopForm)
+    await updateSetting('shop_details', updatedShopForm)
+  }
+
+  const handleAddServiceTerm = async () => {
+    const text = newItemText['service_terms']?.trim()
+    if (!text) return
+    const updated = [...(shopForm.service_terms || []), text]
+    const updatedShopForm = { ...shopForm, service_terms: updated }
+    setShopForm(updatedShopForm)
+    await updateSetting('shop_details', updatedShopForm)
+    setNewItemText(prev => ({ ...prev, service_terms: '' }))
+  }
+
+  const handleDeleteServiceTerm = async (index) => {
+    const updated = [...(shopForm.service_terms || [])]
+    updated.splice(index, 1)
+    const updatedShopForm = { ...shopForm, service_terms: updated }
+    setShopForm(updatedShopForm)
+    await updateSetting('shop_details', updatedShopForm)
   }
 
   if (userRole !== 'admin') {
@@ -110,6 +161,18 @@ const SettingsPage = () => {
       brandModels[editModal.index] = trimmed
       currentModels[editModal.brand] = brandModels
       await updateSetting('models', currentModels)
+    } else if (editModal.key === 'invoice_terms') {
+      const updated = [...(shopForm.invoice_terms || [])]
+      updated[editModal.index] = trimmed
+      const updatedShopForm = { ...shopForm, invoice_terms: updated }
+      setShopForm(updatedShopForm)
+      await updateSetting('shop_details', updatedShopForm)
+    } else if (editModal.key === 'service_terms') {
+      const updated = [...(shopForm.service_terms || [])]
+      updated[editModal.index] = trimmed
+      const updatedShopForm = { ...shopForm, service_terms: updated }
+      setShopForm(updatedShopForm)
+      await updateSetting('shop_details', updatedShopForm)
     } else {
       const currentItems = [...(settings[editModal.key]?.items || [])]
       currentItems[editModal.index] = trimmed
@@ -189,6 +252,37 @@ const SettingsPage = () => {
           </p>
           <div className="space-y-3">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Shop Logo</label>
+              {shopForm.logo_url ? (
+                <div className="flex items-center gap-3">
+                  <img src={shopForm.logo_url} alt="Logo" className="w-16 h-16 object-contain rounded-xl border border-gray-200" />
+                  <button
+                    type="button"
+                    onClick={() => setShopForm(prev => ({...prev, logo_url: ''}))}
+                    className="text-xs text-[#ED2939] font-medium"
+                  >
+                    Remove Logo
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl h-20 cursor-pointer hover:border-[#002395] transition">
+                  <i className="fas fa-image text-xl text-gray-300 mb-1"></i>
+                  <span className="text-xs text-gray-400">Upload Logo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files[0]
+                      if (!file) return
+                      const url = await uploadImageToCloudinary(file)
+                      setShopForm(prev => ({...prev, logo_url: url}))
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Shop Name</label>
               <input type="text" value={shopForm.name}
                 onChange={e => setShopForm(prev => ({...prev, name: e.target.value}))}
@@ -261,6 +355,13 @@ const SettingsPage = () => {
                 className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Watermark Text</label>
+              <input type="text" value={shopForm.watermark_text || ''}
+                onChange={e => setShopForm(prev => ({...prev, watermark_text: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
             <button
               onClick={handleSaveShopDetails}
               className="w-full bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold"
@@ -309,6 +410,84 @@ const SettingsPage = () => {
             </div>
           </div>
         ))}
+
+        {/* INVOICE TERMS */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide border-l-4 pl-3 text-[#002395] border-[#002395]">
+              <i className="fas fa-file-invoice mr-2"></i>
+              Invoice Terms & Conditions
+            </p>
+            <span className="text-xs text-gray-400">{(shopForm.invoice_terms || []).length} items</span>
+          </div>
+
+          <div className="space-y-2 mb-3">
+            {(shopForm.invoice_terms || []).map((item, index) => (
+              <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <span className="flex-1 text-sm text-[#0f172a]">{item}</span>
+                <button onClick={() => handleEditItem('invoice_terms', index, item)} className="text-[#002395] p-1">
+                  <i className="fas fa-edit text-xs"></i>
+                </button>
+                <button onClick={() => handleDeleteInvoiceTerm(index)} className="text-[#ED2939] p-1">
+                  <i className="fas fa-times text-xs"></i>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add new invoice term..."
+              value={newItemText['invoice_terms'] || ''}
+              onChange={e => setNewItemText(prev => ({ ...prev, invoice_terms: e.target.value }))}
+              onKeyPress={e => e.key === 'Enter' && handleAddInvoiceTerm()}
+              className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+            />
+            <button onClick={handleAddInvoiceTerm} className="bg-[#002395] text-white rounded-xl px-4 py-2 text-sm font-semibold">
+              Add
+            </button>
+          </div>
+        </div>
+
+        {/* SERVICE TERMS */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide border-l-4 pl-3 text-[#ED2939] border-[#ED2939]">
+              <i className="fas fa-tools mr-2"></i>
+              Service Terms & Conditions
+            </p>
+            <span className="text-xs text-gray-400">{(shopForm.service_terms || []).length} items</span>
+          </div>
+
+          <div className="space-y-2 mb-3">
+            {(shopForm.service_terms || []).map((item, index) => (
+              <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <span className="flex-1 text-sm text-[#0f172a]">{item}</span>
+                <button onClick={() => handleEditItem('service_terms', index, item)} className="text-[#002395] p-1">
+                  <i className="fas fa-edit text-xs"></i>
+                </button>
+                <button onClick={() => handleDeleteServiceTerm(index)} className="text-[#ED2939] p-1">
+                  <i className="fas fa-times text-xs"></i>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add new service term..."
+              value={newItemText['service_terms'] || ''}
+              onChange={e => setNewItemText(prev => ({ ...prev, service_terms: e.target.value }))}
+              onKeyPress={e => e.key === 'Enter' && handleAddServiceTerm()}
+              className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+            />
+            <button onClick={handleAddServiceTerm} className="bg-[#002395] text-white rounded-xl px-4 py-2 text-sm font-semibold">
+              Add
+            </button>
+          </div>
+        </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-3 border-l-4 border-purple-700 pl-3">
