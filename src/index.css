@@ -27,3 +27,16 @@ input, select, textarea {
     transform: none !important;
   }
 }
+
+@media print {
+  body {
+    visibility: hidden;
+  }
+  #print-label-root {
+    visibility: visible;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+}
+

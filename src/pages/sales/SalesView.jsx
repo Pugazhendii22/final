@@ -35,38 +35,17 @@ const SalesView = () => {
     fetchData();
   }, [id]);
 
-  const handlePrintInvoice = async () => {
-    if (printing) return;
-    setPrinting(true);
-    try {
-      // Re-fetch fresh data from Firestore before printing
-      const freshSnap = await getDoc(doc(db, 'sales', id));
-      const freshData = freshSnap.exists() ? { id: freshSnap.id, ...freshSnap.data() } : sale;
-
-      const invoiceHTML = generateInvoiceHTML(freshData, shopDetails, userDisplayName || currentUser?.email);
-
-      const existing = document.getElementById('invoice-print-overlay');
-      if (existing) existing.remove();
-
-      const printDiv = document.createElement('div');
-      printDiv.id = 'invoice-print-overlay';
-      printDiv.style.cssText = 'display:none;';
-      printDiv.innerHTML = invoiceHTML;
-      document.body.appendChild(printDiv);
-      printDiv.style.display = 'block';
-
-      setTimeout(() => {
-        window.print();
-        setTimeout(() => {
-          printDiv.remove();
-          setPrinting(false);
-        }, 1000);
-      }, 800);
-    } catch (err) {
-      console.error('Print error:', err);
-      setPrinting(false);
-    }
-  };
+  const handlePrintInvoice = () => {
+    const htmlContent = generateInvoiceHTML(sale, shopDetails, userDisplayName || currentUser?.email)
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    printWindow.document.open()
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 600)
+  }
 
 
   if (loading) return <div className="p-4 md:p-8 text-center">Loading...</div>;
