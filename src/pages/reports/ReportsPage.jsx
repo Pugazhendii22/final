@@ -157,6 +157,7 @@ const ReportsPage = () => {
   const totalSalesRev = filteredSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
   let newProdRev = 0; let shRev = 0;
   let payCash = 0; let payUpi = 0; let payCard = 0; let paySplit = 0;
+  let totalSalesProfit = 0; let totalSalesDiscount = 0; let totalWalletCredited = 0;
 
   filteredSales.forEach(s => {
     if (s.saleType === 'New Product') newProdRev += Number(s.totalAmount) || 0;
@@ -166,11 +167,16 @@ const ReportsPage = () => {
     else if (s.paymentMethod === 'UPI') payUpi += Number(s.totalAmount) || 0;
     else if (s.paymentMethod === 'Card') payCard += Number(s.totalAmount) || 0;
     else if (s.paymentMethod === 'Split') paySplit += Number(s.totalAmount) || 0;
+
+    totalSalesProfit += Number(s.totalProfit) || 0;
+    totalSalesDiscount += Number(s.discount) || 0;
+    totalWalletCredited += Number(s.walletCredited) || 0;
   });
 
   // --- SERVICE REPORT CALCS ---
   const filteredSrv = serviceOrders.filter(s => inRange(s.createdAt));
   const totalSrvRev = filteredSrv.reduce((sum, s) => sum + (Number(s.estimatedPrice) || 0), 0);
+  const totalSrvProfit = filteredSrv.reduce((sum, s) => sum + (Number(s.serviceProfit) || 0), 0);
   const srvStatus = { completed: 0, pending: 0, returned: 0 };
   filteredSrv.forEach(s => {
     if (s.status === 'Completed') srvStatus.completed++;
@@ -244,6 +250,9 @@ const ReportsPage = () => {
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Revenue</p><p className="text-xl font-bold text-[#002395] stat-value">₹{totalSalesRev}</p></div>
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">New Product Rev</p><p className="text-xl font-bold text-[#002395] stat-value">₹{newProdRev}</p></div>
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">2nd-Hand Rev</p><p className="text-xl font-bold text-[#002395] stat-value">₹{shRev}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Profit</p><p className="text-xl font-bold text-green-600 stat-value">₹{totalSalesProfit}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Discounts</p><p className="text-xl font-bold text-[#ED2939] stat-value">₹{totalSalesDiscount}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Wallet Credits</p><p className="text-xl font-bold text-[#002395] stat-value">₹{totalWalletCredited}</p></div>
                 </div>
               </div>
               
@@ -312,6 +321,7 @@ const ReportsPage = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Orders</p><p className="text-xl font-bold text-[#002395] stat-value">{filteredSrv.length}</p></div>
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Revenue</p><p className="text-xl font-bold text-[#002395] stat-value">₹{totalSrvRev}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Service Profit</p><p className="text-xl font-bold text-green-600 stat-value">₹{totalSrvProfit}</p></div>
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words">
                     <p className="text-xs text-[#64748b] mb-1 stat-label">Status Overview</p>
                     <p className="text-sm mt-1">Completed: <span className="font-bold">{srvStatus.completed}</span> | Pending: <span className="font-bold">{srvStatus.pending}</span> | Returned: <span className="font-bold">{srvStatus.returned}</span></p>
@@ -366,6 +376,9 @@ const ReportsPage = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Available</p><p className="text-xl font-bold text-[#002395] stat-value">{shAvailable}</p></div>
                   <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Sold</p><p className="text-xl font-bold text-[#002395] stat-value">{shSold}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Repaired Before Sale</p><p className="text-xl font-bold text-[#ED2939] stat-value">{secondHand.filter(s => s.wasRepaired).length}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Total Repair Costs</p><p className="text-xl font-bold text-[#ED2939] stat-value">₹{secondHand.reduce((sum, s) => sum + (Number(s.repairCost) || 0), 0)}</p></div>
+                  <div className="bg-white rounded-xl p-4 border border-[#e2e8f0] shadow-sm text-center stat-card break-words"><p className="text-xs text-[#64748b] mb-1 stat-label">Avg Profit/Mobile</p><p className="text-xl font-bold text-green-600 stat-value">₹{secondHand.length > 0 ? Math.round(secondHand.reduce((sum, s) => sum + (Number(s.profit) || 0), 0) / secondHand.length) : 0}</p></div>
                 </div>
               </div>
 
@@ -387,6 +400,7 @@ const ReportsPage = () => {
                         <th className="px-3 py-2 text-left whitespace-nowrap">Brand/Model</th>
                         <th className="px-3 py-2 text-left whitespace-nowrap">Specs</th>
                         <th className="px-3 py-2 text-left whitespace-nowrap">Price</th>
+                        <th className="px-3 py-2 text-left whitespace-nowrap">Profit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -395,11 +409,12 @@ const ReportsPage = () => {
                           <td className="px-3 py-2 text-sm break-words">{s.brand} {s.model}</td>
                           <td className="px-3 py-2 text-sm break-words">{s.ram} / {s.rom}</td>
                           <td className="px-3 py-2 text-sm break-words font-bold">₹{s.salePrice}</td>
+                          <td className={`px-3 py-2 text-sm break-words font-bold ${(Number(s.profit) || 0) >= 0 ? 'text-green-600' : 'text-[#ED2939]'}`}>₹{Number(s.profit) || 0}</td>
                         </tr>
                       ))}
                       {secondHand.filter(s => s.status !== 'sold').length === 0 && (
                         <tr>
-                          <td colSpan="3" className="px-3 py-2 text-sm break-words text-center text-gray-500">No devices available.</td>
+                          <td colSpan="4" className="px-3 py-2 text-sm break-words text-center text-gray-500">No devices available.</td>
                         </tr>
                       )}
                     </tbody>

@@ -356,13 +356,13 @@ const CustomerForm = ({ initialData, onSave, onCancel }) => {
         <button
           type="button"
           onClick={() => setFormData({ ...formData, isRegular: !formData.isRegular })}
-          className={`w-11 h-6 rounded-full transition-all duration-200 relative flex-shrink-0 focus:outline-none ${
-            formData.isRegular ? 'bg-[#002395]' : 'bg-gray-300'
+          className={`relative inline-flex items-center flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+            formData.isRegular ? 'bg-[#002395]' : 'bg-gray-200'
           }`}
         >
-          <div
-            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-200 transform ${
-              formData.isRegular ? 'translate-x-5' : 'translate-x-0'
+          <span
+            className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${
+              formData.isRegular ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
         </button>

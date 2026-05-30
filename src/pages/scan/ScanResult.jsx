@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import PatternLock from '../../components/PatternLock';
+import ImageModal from '../../components/common/ImageModal';
 
 const Badge = ({ children, color }) => (
   <span className={`rounded-full px-3 py-1 text-xs font-bold ${color}`}>
@@ -27,7 +28,12 @@ const Section = ({ title, children }) => (
 const ScanResult = () => {
   const { labelNumber } = useParams();
   const [data, setData] = useState(null);
+  const [serviceOrder, setServiceOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showDeviceImage, setShowDeviceImage] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
 
   useEffect(() => {
     const fetchRegistry = async () => {
@@ -35,7 +41,14 @@ const ScanResult = () => {
         const q = query(collection(db, 'label_registry'), where('labelNumber', '==', Number(labelNumber)));
         const snap = await getDocs(q);
         if (!snap.empty) {
-          setData(snap.docs[0].data());
+          const labelData = snap.docs[0].data();
+          setData(labelData);
+          if (labelData.labelType === 'service_order' && labelData.referenceId) {
+            const orderSnap = await getDoc(doc(db, 'service_orders', labelData.referenceId));
+            if (orderSnap.exists()) {
+              setServiceOrder({ id: orderSnap.id, ...orderSnap.data() });
+            }
+          }
         }
       } catch (err) {
         console.error(err);
@@ -69,6 +82,16 @@ const ScanResult = () => {
   }[labelType] || 'bg-gray-100 text-gray-800';
 
   const typeName = labelType.replace('_', ' ').toUpperCase();
+
+  const receivedAtVal = serviceOrder?.receivedAt || d?.receivedAt || d?.createdAt;
+  const expectedCompletionAtVal = serviceOrder?.expectedCompletionAt || d?.expectedCompletionAt;
+  const orderStatus = serviceOrder?.status || d?.status;
+  
+  const parsedReceivedAt = receivedAtVal ? (receivedAtVal.toDate ? receivedAtVal.toDate() : new Date(receivedAtVal)) : null;
+  const parsedExpectedCompletionAt = expectedCompletionAtVal ? (expectedCompletionAtVal.toDate ? expectedCompletionAtVal.toDate() : new Date(expectedCompletionAtVal)) : null;
+  
+  const isValidDate = (dateObj) => dateObj instanceof Date && !isNaN(dateObj.getTime());
+  const isOverdue = parsedExpectedCompletionAt && orderStatus !== 'Completed' && parsedExpectedCompletionAt < new Date();
 
   return (
   <div className="min-h-screen bg-[#f8fafc] pb-8">
@@ -176,40 +199,325 @@ const ScanResult = () => {
         {labelType === 'service_order' && (
           <>
             <div className="bg-white rounded-2xl shadow-sm border-l-4 border-[#ED2939] p-5">
-              <p className="text-xs font-bold text-[#ED2939] font-mono">{d?.orderNumber}</p>
-              <h2 className="text-xl font-bold text-[#0f172a] mt-1">{d?.customerName}</h2>
-              <p className="text-gray-500 text-sm mt-0.5">{d?.customerPhone}</p>
-              <p className="text-lg font-bold text-[#002395] mt-2">₹{d?.estimatedPrice}</p>
+              <p className="text-xs font-bold text-[#ED2939] font-mono">{serviceOrder?.orderNumber || d?.orderNumber}</p>
+              <h2 className="text-xl font-bold text-[#0f172a] mt-1">{serviceOrder?.customerName || d?.customerName}</h2>
+              <p className="text-gray-500 text-sm mt-0.5">
+                <i className="fas fa-phone text-green-500 mr-1"></i>
+                {serviceOrder?.customerPhone || d?.customerPhone}
+              </p>
+              {(serviceOrder?.alternatePhone || d?.alternatePhone) && (
+                <p className="text-gray-400 text-xs mt-0.5">{serviceOrder?.alternatePhone || d?.alternatePhone}</p>
+              )}
+              <p className="text-lg font-bold text-[#002395] mt-2">₹{serviceOrder?.estimatedPrice || d?.estimatedPrice}</p>
+              {(serviceOrder?.advancePaid || d?.advancePaid) > 0 && (
+                <p className="text-sm text-green-600 mt-1">Advance: ₹{serviceOrder?.advancePaid || d?.advancePaid}</p>
+              )}
+              <span className={`mt-2 inline-block text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                (serviceOrder?.status || d?.status) === 'Completed' ? 'bg-green-100 text-green-700' :
+                (serviceOrder?.status || d?.status) === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
+                (serviceOrder?.status || d?.status) === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
+                (serviceOrder?.status || d?.status) === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
+                (serviceOrder?.status || d?.status) === 'Awaiting Customer Approval' ? 'bg-purple-100 text-purple-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                {serviceOrder?.status || d?.status || 'Received'}
+              </span>
             </div>
+
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
-                Service Details
+                Device Info
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-gray-400">Device</p>
-                  <p className="font-semibold text-[#0f172a] text-sm">
-                    {d?.brand} {d?.model}
-                  </p>
+                  <p className="text-xs text-gray-400">Brand / Model</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{serviceOrder?.brand || d?.brand} {serviceOrder?.model || d?.model}</p>
                 </div>
+                {(serviceOrder?.colour || d?.colour) && (
+                  <div>
+                    <p className="text-xs text-gray-400">Colour</p>
+                    <p className="font-semibold text-[#0f172a] text-sm">{serviceOrder?.colour || d?.colour}</p>
+                  </div>
+                )}
+                {(serviceOrder?.imei1 || serviceOrder?.imei || d?.imei1) && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-400">IMEI</p>
+                    <p className="font-semibold text-[#0f172a] text-sm break-all">{serviceOrder?.imei1 || serviceOrder?.imei || d?.imei1}</p>
+                  </div>
+                )}
+                {serviceOrder?.imei2 && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-400">IMEI 2</p>
+                    <p className="font-semibold text-[#0f172a] text-sm break-all">{serviceOrder?.imei2}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-gray-400">Technician</p>
-                  <p className="font-semibold text-[#0f172a] text-sm">{d?.technicianName}</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">{serviceOrder?.technicianName || d?.technicianName || '-'}</p>
                 </div>
-              </div>
-              {d?.complaintTypes?.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs text-gray-400 mb-2">Issues</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {d.complaintTypes.map((c, i) => (
-                      <span key={i} className="bg-[#ED2939]/10 text-[#ED2939] text-xs px-2 py-0.5 rounded-full">
-                        {c}
-                      </span>
-                    ))}
+                {(serviceOrder?.lockType || d?.lockType) && (serviceOrder?.lockType || d?.lockType) !== 'None' && (
+                  <div>
+                    <p className="text-xs text-gray-400">Lock Type</p>
+                    <p className="font-semibold text-[#0f172a] text-sm">{serviceOrder?.lockType || d?.lockType}</p>
                   </div>
+                )}
+              </div>
+               {((serviceOrder?.lockPattern || d?.lockPattern)?.filter(Boolean).length > 0) && (() => {
+                const pattern = (serviceOrder?.lockPattern || d?.lockPattern).filter(Boolean);
+                const points = pattern.map(id => {
+                  const idx = id - 1;
+                  return {
+                    id,
+                    cx: 25 + (idx % 3) * 75,
+                    cy: 25 + Math.floor(idx / 3) * 75
+                  };
+                });
+                return (
+                  <div className="mt-3 flex flex-col items-center">
+                    <p className="text-xs text-gray-400 mb-2 self-start">Pattern</p>
+                    <div className="relative" style={{ width: '160px', height: '160px' }}>
+                      <svg viewBox="0 0 200 200" className="w-40 h-40 bg-[#f0f4ff] rounded-2xl mx-auto" preserveAspectRatio="xMidYMid meet">
+                        <defs>
+                          <marker
+                            id="arrow"
+                            viewBox="0 0 10 10"
+                            refX="18"
+                            refY="5"
+                            markerWidth="6"
+                            markerHeight="6"
+                            orient="auto-start-reverse"
+                          >
+                            <path d="M 0 1.5 L 7 5 L 0 8.5 z" fill="#002395" />
+                          </marker>
+                        </defs>
+                        
+                        {points.slice(0, -1).map((p, i) => {
+                          const next = points[i + 1];
+                          return (
+                            <line
+                              key={i}
+                              x1={p.cx}
+                              y1={p.cy}
+                              x2={next.cx}
+                              y2={next.cy}
+                              stroke="#002395"
+                              strokeWidth="3"
+                              opacity="0.8"
+                              markerEnd="url(#arrow)"
+                            />
+                          );
+                        })}
+
+                        {Array.from({ length: 9 }).map((_, index) => {
+                          const id = index + 1;
+                          const cx = 25 + (index % 3) * 75;
+                          const cy = 25 + Math.floor(index / 3) * 75;
+                          const isSelected = pattern.includes(id);
+                          const isFirst = pattern[0] === id;
+                          const isLast = pattern.length > 1 && pattern[pattern.length - 1] === id;
+                          
+                          let fill = 'white';
+                          let stroke = '#D1D5DB';
+                          let textColor = '#6B7280';
+                          
+                          if (isSelected) {
+                            if (isFirst) {
+                              fill = '#22C55E';
+                              stroke = '#22C55E';
+                            } else if (isLast) {
+                              fill = '#ED2939';
+                              stroke = '#ED2939';
+                            } else {
+                              fill = '#002395';
+                              stroke = '#002395';
+                            }
+                            textColor = 'white';
+                          }
+                          
+                          return (
+                            <g key={id}>
+                              <circle cx={cx} cy={cy} r="16" fill={fill} stroke={stroke} strokeWidth="2" />
+                              <text
+                                x={cx}
+                                y={cy}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fill={textColor}
+                                fontSize="12"
+                                fontWeight="bold"
+                              >
+                                {id}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                    
+                    <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',justifyContent:'center',gap:'4px',marginTop:'8px'}}>
+                      {pattern.map((dot, index) => {
+                        const isFirst = index === 0;
+                        const isLast = pattern.length > 1 && index === pattern.length - 1;
+                        const dotBg = isFirst ? '#22C55E' : isLast ? '#ED2939' : '#002395';
+                        
+                        return (
+                          <span key={dot} style={{display:'inline-flex',alignItems:'center',gap:'4px'}}>
+                            <span style={{
+                              width: '24px', height: '24px',
+                              borderRadius: '50%',
+                              background: dotBg,
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>{dot}</span>
+                            {index < pattern.length - 1 && (
+                              <span style={{color:'#002395',fontWeight:'bold'}}>→</span>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    <p style={{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'4px'}}>
+                      Start: {pattern[0]} → End: {pattern[pattern.length-1]} ({pattern.length} points)
+                    </p>
+                  </div>
+                );
+              })()}
+              {(serviceOrder?.rawMaterialCost || d?.rawMaterialCost) > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-400">Raw Material Cost</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">₹{serviceOrder?.rawMaterialCost || d?.rawMaterialCost}</p>
+                </div>
+              )}
+              {(serviceOrder?.outsideLabourCost || d?.outsideLabourCost) > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-400">Outside Labour</p>
+                  <p className="font-semibold text-[#0f172a] text-sm">₹{serviceOrder?.outsideLabourCost || d?.outsideLabourCost}</p>
                 </div>
               )}
             </div>
+
+            {/* TIME TRACKING */}
+            {(isValidDate(parsedReceivedAt) || isValidDate(parsedExpectedCompletionAt)) && (
+              <div className={`bg-white rounded-2xl shadow-sm border-l-4 p-4 ${
+                isOverdue ? 'border-[#ED2939]' : 'border-green-500'
+              }`}>
+                <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3">
+                  Time Tracking
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {isValidDate(parsedReceivedAt) && (
+                    <div>
+                      <p className="text-xs text-gray-400">Received</p>
+                      <p className="font-semibold text-[#0f172a] text-sm">
+                        {parsedReceivedAt.toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  )}
+                  {isValidDate(parsedExpectedCompletionAt) && (
+                    <div>
+                      <p className="text-xs text-gray-400">Expected By</p>
+                      <p className={`font-semibold text-sm ${isOverdue ? 'text-[#ED2939]' : 'text-[#0f172a]'}`}>
+                        {parsedExpectedCompletionAt.toLocaleString('en-IN')}
+                        {isOverdue && (
+                          <span className="ml-1 text-xs bg-[#ED2939] text-white px-1.5 py-0.5 rounded-full">
+                            OVERDUE
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(serviceOrder?.complaintTypes || d?.complaintTypes)?.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-bold text-[#ED2939] uppercase tracking-wide mb-3 border-l-4 border-[#ED2939] pl-3">
+                  Issues Reported
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(serviceOrder?.complaintTypes || d?.complaintTypes)?.map((c, i) => (
+                    <span key={i} className="bg-[#ED2939]/10 text-[#ED2939] text-xs px-3 py-1 rounded-full font-medium">
+                      {c}
+                    </span>
+                  ))}
+                  {(serviceOrder?.otherComplaint || d?.otherComplaint) && (
+                    <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full">
+                      {serviceOrder?.otherComplaint || d?.otherComplaint}
+                    </span>
+                  )}
+                </div>
+                {(serviceOrder?.problemDetails || d?.problemDetails) && (
+                  <p className="text-sm text-gray-600 mt-3 bg-gray-50 rounded-xl p-3">{serviceOrder?.problemDetails || d?.problemDetails}</p>
+                )}
+              </div>
+            )}
+
+            {(serviceOrder?.accessories || d?.accessories || serviceOrder?.accessoriesCollected)?.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                  Accessories Collected
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(serviceOrder?.accessories || d?.accessories || serviceOrder?.accessoriesCollected || []).map((acc, i) => (
+                    <span key={i} className="bg-[#002395]/10 text-[#002395] text-xs px-3 py-1 rounded-full">
+                      {acc}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(serviceOrder?.suggestions || d?.suggestions) && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                  Notes & Suggestions
+                </p>
+                <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3">{serviceOrder?.suggestions || d?.suggestions}</p>
+              </div>
+            )}
+
+            {(serviceOrder?.imageUrl || d?.imageUrl) && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+                  Device Image
+                </p>
+                <div className="flex justify-center">
+                  {showDeviceImage ? (
+                    <div className="relative w-full">
+                      <img
+                        src={serviceOrder?.imageUrl || d?.imageUrl}
+                        alt="Device"
+                        className="max-w-full h-auto rounded-lg shadow-sm border border-[#e2e8f0] cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => {
+                          setViewerUrl(serviceOrder?.imageUrl || d?.imageUrl);
+                          setViewerTitle('Device Image');
+                          setViewerOpen(true);
+                        }}
+                      />
+                      <button
+                        onClick={() => setShowDeviceImage(false)}
+                        className="absolute top-1 right-1 bg-black/50 text-white text-xs px-2 py-1 rounded-lg"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDeviceImage(true)}
+                      className="w-full h-16 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-[#002395] text-sm font-medium"
+                    >
+                      <i className="fas fa-image"></i> View Photo
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -284,6 +592,13 @@ const ScanResult = () => {
 
       </div>
     )}
+
+    <ImageModal
+      isOpen={viewerOpen}
+      onClose={() => setViewerOpen(false)}
+      imageUrl={viewerUrl}
+      title={viewerTitle}
+    />
   </div>
 );
 };

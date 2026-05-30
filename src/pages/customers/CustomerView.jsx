@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { creditWallet } from '../../utils/walletUtils';
 import CustomerForm from './CustomerForm';
 import Layout from '../../components/common/Layout';
+import ImageModal from '../../components/common/ImageModal';
 
 const CustomerView = () => {
   const { id } = useParams();
@@ -17,6 +18,10 @@ const CustomerView = () => {
   const [customer, setCustomer] = useState(quickData || null);
   const [loading, setLoading] = useState(!quickData);
   const [showEdit, setShowEdit] = useState(false);
+  const [showImage, setShowImage] = useState({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
 
   const [sales, setSales] = useState([]);
   const [serviceOrders, setServiceOrders] = useState([]);
@@ -351,8 +356,84 @@ const CustomerView = () => {
           </div>
         </div>
       )}
+      {/* IMAGES */}
+      {(customer?.photoUrl || customer?.idProofUrl) && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+            Photos
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {customer?.photoUrl && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Customer Photo</p>
+                {showImage?.customerPhoto ? (
+                  <div className="relative">
+                    <img
+                      src={customer.photoUrl}
+                      alt="Customer"
+                      className="w-full h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => {
+                        setViewerUrl(customer.photoUrl);
+                        setViewerTitle('Customer Photo');
+                        setViewerOpen(true);
+                      }}
+                      onError={(e) => { e.target.style.display='none' }}
+                    />
+                    <button
+                      onClick={() => setShowImage(prev => ({...prev, customerPhoto: false}))}
+                      className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowImage(prev => ({...prev, customerPhoto: true}))}
+                    className="w-full h-16 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-[#002395] text-sm font-medium"
+                  >
+                    <i className="fas fa-image"></i> View Photo
+                  </button>
+                )}
+              </div>
+            )}
 
-      {/* PURCHASE HISTORY */}
+            {customer?.idProofUrl && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">ID Proof</p>
+                {showImage?.idProof ? (
+                  <div className="relative">
+                    <img
+                      src={customer.idProofUrl}
+                      alt="ID Proof"
+                      className="w-full h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => {
+                        setViewerUrl(customer.idProofUrl);
+                        setViewerTitle('ID Proof');
+                        setViewerOpen(true);
+                      }}
+                      onError={(e) => { e.target.style.display='none' }}
+                    />
+                    <button
+                      onClick={() => setShowImage(prev => ({...prev, idProof: false}))}
+                      className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowImage(prev => ({...prev, idProof: true}))}
+                    className="w-full h-16 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-[#002395] text-sm font-medium"
+                  >
+                    <i className="fas fa-id-card"></i> View ID Proof
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
           Purchase History
@@ -519,6 +600,13 @@ const CustomerView = () => {
       )}
 
     </div>
+    
+    <ImageModal
+      isOpen={viewerOpen}
+      onClose={() => setViewerOpen(false)}
+      imageUrl={viewerUrl}
+      title={viewerTitle}
+    />
     </Layout>
   );
 };

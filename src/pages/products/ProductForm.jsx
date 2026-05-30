@@ -3,7 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { collection, getDocs, addDoc, query, where, setDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { getLabelNumber } from '../../utils/getLabelNumber';
-import { printLabel } from '../../utils/printLabel.jsx';
+import { printLabel, generateLabelHTML } from '../../utils/printLabel.jsx';
+import PrinterSelector from '../../components/PrinterSelector';
 import { uploadImageToCloudinary } from '../../utils/uploadImage';
 
 const generateSerialNumber = () => {
@@ -37,8 +38,10 @@ const ProductForm = ({ onSave, onCancel, initialData = null }) => {
   const [assignedLabelNumber, setAssignedLabelNumber] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [localId, setLocalId] = useState(initialData?.id || null);
-  const [saveStatus, setSaveStatus] = useState('idle'); // idle, saving, saved
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPrinter, setShowPrinter] = useState(false);
+  const [labelHTML, setLabelHTML] = useState('');
 
   useEffect(() => {
     if (localId) {
@@ -246,18 +249,19 @@ const ProductForm = ({ onSave, onCancel, initialData = null }) => {
   };
 
   const handlePrintLabel = () => {
-    if (labelAssigned && assignedLabelNumber) {
-      printLabel({
-        labelNumber: assignedLabelNumber,
-        labelType: 'product',
-        data: {
-          productName: formData.name || '',
-          brand: formData.brand || '',
-          category: formData.category || '',
-          salePrice: Number(formData.salePrice) || 0,
-        }
-      });
+    const labelData = {
+      labelType: 'product',
+      labelNumber: labelAssigned ? assignedLabelNumber : null,
+      data: {
+        productName: formData.name || '',
+        brand: formData.brand || '',
+        category: formData.category || '',
+        salePrice: Number(formData.salePrice) || 0,
+      }
     }
+    const html = generateLabelHTML(labelData)
+    setLabelHTML(html)
+    setShowPrinter(true)
   };
 
   return (
@@ -532,6 +536,12 @@ const ProductForm = ({ onSave, onCancel, initialData = null }) => {
             </button>
           </div>
         </div>
+        <PrinterSelector
+          isOpen={showPrinter}
+          onClose={() => setShowPrinter(false)}
+          htmlContent={labelHTML}
+          title="Print Label"
+        />
       </div>
     </div>
   );

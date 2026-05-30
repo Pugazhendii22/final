@@ -141,29 +141,48 @@ const PatternLock = ({ value = [], onChange, readOnly = false }) => {
             viewBox="0 0 200 200" 
             preserveAspectRatio="xMidYMid meet"
           >
-            {/* Pattern path */}
-            {pathData && (
-              <path
-                d={pathData}
-                fill="none"
+            <defs>
+              <marker
+                id="arrow"
+                viewBox="0 0 10 10"
+                refX="18"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1.5 L 7 5 L 0 8.5 z" fill="#002395" />
+              </marker>
+            </defs>
+
+            {/* Connecting segments */}
+            {points.slice(0, -1).map((p, i) => {
+              const next = points[i + 1];
+              return (
+                <line
+                  key={i}
+                  x1={p.cx}
+                  y1={p.cy}
+                  x2={next.cx}
+                  y2={next.cy}
+                  stroke="#002395"
+                  strokeWidth="3"
+                  opacity="0.8"
+                  markerEnd="url(#arrow)"
+                />
+              );
+            })}
+
+            {/* Dynamic line while drawing */}
+            {isDrawing && points.length > 0 && (
+              <line
+                x1={points[points.length - 1].cx}
+                y1={points[points.length - 1].cy}
+                x2={currentPos.x}
+                y2={currentPos.y}
                 stroke="#002395"
                 strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.8"
-              />
-            )}
-            
-            {/* Dot connections */}
-            {points.length > 1 && (
-              <path
-                d={`M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`}
-                fill="none"
-                stroke="#002395"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.8"
+                opacity="0.6"
               />
             )}
             
@@ -182,6 +201,26 @@ const PatternLock = ({ value = [], onChange, readOnly = false }) => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', width: '100%', height: '100%' }}>
             {DOTS.map(({ id }, index) => {
               const isSelected = pattern.includes(id);
+              const isFirst = pattern[0] === id;
+              const isLast = pattern.length > 1 && pattern[pattern.length - 1] === id;
+              
+              let bg = 'white';
+              let border = '2px solid #D1D5DB';
+              let textColor = '#6B7280';
+              
+              if (isSelected) {
+                if (isFirst) {
+                  bg = '#22C55E';
+                  border = '2px solid #22C55E';
+                } else if (isLast) {
+                  bg = '#ED2939';
+                  border = '2px solid #ED2939';
+                } else {
+                  bg = '#002395';
+                  border = '2px solid #002395';
+                }
+                textColor = 'white';
+              }
               
               return (
                 <div
@@ -189,15 +228,19 @@ const PatternLock = ({ value = [], onChange, readOnly = false }) => {
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <div
-                    className={`flex items-center justify-center transition-all duration-200 ${
-                      isSelected 
-                        ? 'w-14 h-14 rounded-full bg-[#002395] border-2 border-[#002395] shadow-lg' 
-                        : 'w-14 h-14 rounded-full bg-white border-2 border-gray-300 shadow-sm'
-                    }`}
+                    className="flex items-center justify-center transition-all duration-200 shadow-sm"
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: bg,
+                      border: border,
+                      color: textColor,
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                    }}
                   >
-                    {isSelected && (
-                      <div className="w-4 h-4 rounded-full bg-white" />
-                    )}
+                    {id}
                   </div>
                 </div>
               );
@@ -205,6 +248,41 @@ const PatternLock = ({ value = [], onChange, readOnly = false }) => {
           </div>
         </div>
       </div>
+
+      {pattern.length > 0 && (
+        <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',justifyContent:'center',gap:'4px',marginTop:'8px'}}>
+          {pattern.map((dot, index) => {
+            const isFirst = index === 0;
+            const isLast = pattern.length > 1 && index === pattern.length - 1;
+            const dotBg = isFirst ? '#22C55E' : isLast ? '#ED2939' : '#002395';
+            
+            return (
+              <span key={dot} style={{display:'inline-flex',alignItems:'center',gap:'4px'}}>
+                <span style={{
+                  width: '24px', height: '24px',
+                  borderRadius: '50%',
+                  background: dotBg,
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}>{dot}</span>
+                {index < pattern.length - 1 && (
+                  <span style={{color:'#002395',fontWeight:'bold'}}>→</span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {readOnly && pattern.length > 0 && (
+        <p style={{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'4px'}}>
+          Start: {pattern[0]} → End: {pattern[pattern.length-1]} ({pattern.length} points)
+        </p>
+      )}
       
       {pattern.length > 0 && !readOnly && (
         <button

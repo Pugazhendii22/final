@@ -78,8 +78,8 @@ const ProductList = () => {
   const fab = (
     <button
       onClick={() => setShowModal(true)}
-      className="fixed bottom-20 right-6 w-14 h-14 bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden z-40"
-      style={{ borderRadius: '50%', boxShadow: '0 4px 6px -1px rgba(0, 35, 149, 0.1), 0 2px 4px -1px rgba(0, 35, 149, 0.06)' }}
+      className="w-14 h-14 rounded-full bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden"
+      style={{ boxShadow: '0 4px 12px rgba(0, 35, 149, 0.18)' }}
       aria-label="Add Product"
     >
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>

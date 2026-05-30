@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, query, where, setDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { useAuth } from '../../context/AuthContext';
-import { useSettings } from '../../context/SettingsContext';
+import { useSettings, normalizeChecklistItems } from '../../context/SettingsContext';
 import CustomerAutocomplete from '../../components/common/CustomerAutocomplete';
 import ImeiInput from '../../components/ImeiInput';
 import { getLabelNumber } from '../../utils/getLabelNumber';
-import { printLabel } from '../../utils/printLabel.jsx';
+import { printLabel, generateLabelHTML } from '../../utils/printLabel.jsx';
+import PrinterSelector from '../../components/PrinterSelector';
 import { uploadImageToCloudinary } from '../../utils/uploadImage';
 
 const generateSerialNumber = () => {
@@ -18,42 +19,55 @@ const generateSerialNumber = () => {
   return `FM-${dateStr}-${random}`
 }
 
+const groupByCategory = (items) => {
+  const grouped = {}
+  items.forEach(item => {
+    const cat = item.category || 'Display'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(item)
+  })
+  return grouped
+}
+
 const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const { currentUser } = useAuth();
-  const { deviceChecklist } = useSettings();
+  const { deviceChecklist, complaintTypes } = useSettings();
 
-  const initializeChecklist = () => {
-    const checklist = {}
-    deviceChecklist.forEach(category => {
-      category.items.forEach(item => {
-        const key = item.label.replace(/\s+/g, '_').toLowerCase()
-        checklist[key] = item.type === 'yes_no' ? 'No' : 'Working'
-      })
-    })
-    return checklist
+  const getChecklistForBrand = (selectedBrand) => {
+    const isApple = selectedBrand?.toLowerCase() === 'apple'
+    const specificItems = isApple
+      ? (deviceChecklist.iphone || [])
+      : (deviceChecklist.android || [])
+    const commonItems = deviceChecklist.common || []
+    return { commonItems, specificItems, isApple }
   }
 
-  const defaultChecklist = initializeChecklist();
-
-  const calculateGrade = (checklist) => {
+  const calculateGrade = (checklist, selectedBrand) => {
     if (!checklist) return 'A'
-
     const values = Object.values(checklist)
     const notWorkingCount = values.filter(v => v === 'Not Working').length
-    const hasPhysicalDamage = checklist['physical_damage_/_bent'] === 'Yes'
-    const hasDisplayReplaced = checklist['display_replaced'] === 'Yes'
-    const hasWhiteSpots = checklist['white_spots_on_display'] === 'Yes'
-
-    if (hasPhysicalDamage) return 'D'
+    const hasPhysicalDamage = Object.entries(checklist).some(
+      ([k, v]) => k.includes('physical_damage') && v === 'Yes'
+    )
+    const hasDisplayReplaced = Object.entries(checklist).some(
+      ([k, v]) => k.includes('display_replaced') && v === 'Yes'
+    )
+    const hasWhiteSpots = Object.entries(checklist).some(
+      ([k, v]) => k.includes('white_spots') && v === 'Yes'
+    )
+    const isIcloudLocked = Object.entries(checklist).some(
+      ([k, v]) => k.includes('icloud') && v === 'Yes'
+    )
+    if (hasPhysicalDamage || isIcloudLocked) return 'D'
     if (notWorkingCount >= 4 || hasDisplayReplaced || hasWhiteSpots) return 'C'
     if (notWorkingCount >= 1 && notWorkingCount <= 3) return 'B'
     return 'A'
-  };
+  }
 
   const [formData, setFormData] = useState(() => {
     const base = initialData || {};
-    const checklist = base.conditionChecklist || { ...defaultChecklist };
-    const autoGrade = base.gradeAutoCalculated || calculateGrade(checklist);
+    const checklist = base.conditionChecklist || {};
+    const autoGrade = base.gradeAutoCalculated || 'A';
     const manualOverride = base.gradeManualOverride || false;
     const initialCondition = base.condition || (manualOverride ? base.condition : autoGrade);
 
@@ -108,17 +122,37 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const [customModel, setCustomModel] = useState('');
   const [isCustomModel, setIsCustomModel] = useState(false);
   const [conditionChecklist, setConditionChecklist] = useState({});
+  const [brandInitialized, setBrandInitialized] = useState(false);
+  const [showPrinter, setShowPrinter] = useState(false);
+  const [labelHTML, setLabelHTML] = useState('');
+  const [wasRepaired, setWasRepaired] = useState(initialData?.wasRepaired || false);
+  const [repairItems, setRepairItems] = useState(initialData?.repairItems || []);
+  const [repairCost, setRepairCost] = useState(initialData?.repairCost || 0);
 
   useEffect(() => {
-    if (deviceChecklist.length > 0) {
-      const initialized = initializeChecklist();
-      if (initialData?.conditionChecklist) {
-        setConditionChecklist(initialData.conditionChecklist);
-      } else {
-        setConditionChecklist(initialized);
-      }
+    if (!formData.brand) return
+
+    if (initialData?.conditionChecklist && !brandInitialized) {
+      setConditionChecklist(initialData.conditionChecklist)
+      setBrandInitialized(true)
+      return
     }
-  }, [deviceChecklist]);
+
+    const { commonItems, specificItems } = getChecklistForBrand(formData.brand)
+    const allItems = [...commonItems, ...specificItems]
+    const newChecklist = {}
+    allItems.forEach(item => {
+      const key = item.label.replace(/\s+/g, '_').toLowerCase()
+      newChecklist[key] = item.type === 'yes_no' ? 'No' : 'Working'
+    })
+    setConditionChecklist(newChecklist)
+    setBrandInitialized(true)
+  }, [formData.brand, deviceChecklist])
+
+  useEffect(() => {
+    const total = repairItems.reduce((sum, item) => sum + (Number(item.cost) || 0), 0)
+    setRepairCost(total)
+  }, [repairItems])
 
   useEffect(() => {
     if (localId) {
@@ -210,7 +244,7 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   const handleChecklistChange = (key, value) => {
     const newChecklist = { ...conditionChecklist, [key]: value };
     setConditionChecklist(newChecklist);
-    const newGrade = calculateGrade(newChecklist);
+    const newGrade = calculateGrade(newChecklist, formData.brand);
     setFormData(prev => ({
       ...prev,
       conditionChecklist: newChecklist,
@@ -219,6 +253,28 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
       gradeManualOverride: false
     }));
   };
+
+  const addRepairItem = () => {
+    setRepairItems(prev => [...prev, {
+      description: '',
+      isCustom: false,
+      cost: '',
+      technician: '',
+      date: new Date().toISOString().split('T')[0]
+    }])
+  }
+
+  const removeRepairItem = (index) => {
+    setRepairItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateRepairItem = (index, field, value) => {
+    setRepairItems(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -229,7 +285,11 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
     setSaveStatus('saving');
     setError('');
     try {
-      const finalData = { ...formData, conditionChecklist, createdBy: currentUser.uid };
+      const purchasePrice = Number(formData.purchasePrice) || 0
+      const salePrice = Number(formData.salePrice) || 0
+      const totalCost = purchasePrice + (wasRepaired ? repairCost : 0)
+      const profit = salePrice - totalCost
+      const finalData = { ...formData, conditionChecklist, wasRepaired, repairItems: wasRepaired ? repairItems : [], repairCost: wasRepaired ? repairCost : 0, totalCost, profit, createdBy: currentUser.uid };
       if (finalData.brand === 'Other') {
         finalData.brand = finalData.customBrand;
       }
@@ -259,7 +319,11 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
       const finalSerialNumber = formData.serialNumber || generateSerialNumber();
       setFormData(prev => ({ ...prev, serialNumber: finalSerialNumber }));
 
-      const finalData = { ...formData, conditionChecklist, serialNumber: finalSerialNumber, createdBy: currentUser.uid };
+      const purchasePrice = Number(formData.purchasePrice) || 0
+      const salePrice = Number(formData.salePrice) || 0
+      const totalCost = purchasePrice + (wasRepaired ? repairCost : 0)
+      const profit = salePrice - totalCost
+      const finalData = { ...formData, conditionChecklist, serialNumber: finalSerialNumber, wasRepaired, repairItems: wasRepaired ? repairItems : [], repairCost: wasRepaired ? repairCost : 0, totalCost, profit, createdBy: currentUser.uid };
       if (finalData.brand === 'Other') {
         finalData.brand = finalData.customBrand;
       }
@@ -350,37 +414,23 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
   };
 
   const handlePrintLabel = () => {
-    if (labelAssigned && assignedLabelNumber) {
-      printLabel({
-        labelType: 'second_hand',
-        labelNumber: assignedLabelNumber,
-        data: {
-          brand: formData.brand,
-          model: formData.model,
-          ram: formData.ram,
-          rom: formData.rom,
-          salePrice: formData.salePrice,
-          imei1: formData.imei1,
-          grade: formData.condition,
-          serialNumber: formData.serialNumber || '',
-        }
-      });
-    } else {
-      printLabel({
-        labelType: 'second_hand',
-        labelNumber: null,
-        data: {
-          brand: formData.brand,
-          model: formData.model,
-          ram: formData.ram,
-          rom: formData.rom,
-          salePrice: formData.salePrice,
-          imei1: formData.imei1,
-          grade: formData.condition,
-          serialNumber: formData.serialNumber || '',
-        }
-      });
+    const labelData = {
+      labelType: 'second_hand',
+      labelNumber: labelAssigned ? assignedLabelNumber : null,
+      data: {
+        brand: formData.brand,
+        model: formData.model,
+        ram: formData.ram,
+        rom: formData.rom,
+        salePrice: formData.salePrice,
+        imei1: formData.imei1,
+        grade: formData.condition,
+        serialNumber: formData.serialNumber || '',
+      }
     }
+    const html = generateLabelHTML(labelData)
+    setLabelHTML(html)
+    setShowPrinter(true)
   };
 
   const inputClass = "border border-[#e2e8f0] focus:border-[#002395] focus:ring-2 focus:ring-[#002395]/20 rounded-lg px-4 py-2.5 w-full outline-none transition text-[#0f172a] text-sm";
@@ -612,6 +662,34 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
                 <label className={labelClass}>Sale Price <span className="text-[#ED2939]">*</span></label>
                 <input type="number" inputMode="numeric" pattern="[0-9]*" required min="0" value={formData.salePrice} onChange={e => setFormData({ ...formData, salePrice: e.target.value })} className={inputClass} />
               </div>
+              <div className="md:col-span-2">
+                <div className="bg-[#f8fafc] rounded-xl p-3 border border-gray-100 space-y-2">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Purchase Price</span>
+                    <span>₹{Number(formData.purchasePrice) || 0}</span>
+                  </div>
+                  {wasRepaired && repairCost > 0 && (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Repair Cost</span>
+                      <span>₹{repairCost}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs font-semibold text-[#0f172a] border-t border-gray-200 pt-2">
+                    <span>Total Cost</span>
+                    <span>₹{(Number(formData.purchasePrice) || 0) + repairCost}</span>
+                  </div>
+                  {Number(formData.salePrice) > 0 && (
+                    <div className={`flex justify-between text-sm font-bold border-t border-gray-200 pt-2 ${
+                      (Number(formData.salePrice) - (Number(formData.purchasePrice) || 0) - repairCost) >= 0
+                        ? 'text-green-600'
+                        : 'text-[#ED2939]'
+                    }`}>
+                      <span>Profit</span>
+                      <span>₹{Number(formData.salePrice) - (Number(formData.purchasePrice) || 0) - repairCost}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div>
                 <label className={labelClass}>Purchase Date <span className="text-[#ED2939]">*</span></label>
                 <input type="date" required value={formData.purchaseDate} onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })} className={inputClass} />
@@ -647,6 +725,141 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
             </div>
           </div>
 
+          {/* REPAIR & REFURBISHMENT */}
+          <div>
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Repair &amp; Refurbishment
+            </p>
+            <div className="bg-[#f8fafc] rounded-xl p-4 border border-gray-100 mb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#0f172a]">Phone was repaired before sale</p>
+                  <p className="text-xs text-gray-400">Add repair costs to calculate profit correctly</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWasRepaired(!wasRepaired)
+                    if (wasRepaired) {
+                      setRepairItems([])
+                      setRepairCost(0)
+                    }
+                  }}
+                  className={`relative inline-flex items-center flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                    wasRepaired ? 'bg-[#002395]' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${
+                      wasRepaired ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+            {wasRepaired && (
+              <div className="space-y-3">
+                {repairItems.map((item, index) => (
+                  <div key={index} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-[#002395]">Repair #{index + 1}</p>
+                      <button
+                        type="button"
+                        onClick={() => removeRepairItem(index)}
+                        className="text-[#ED2939] p-1"
+                      >
+                        <i className="fas fa-times text-sm"></i>
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Description <span className="text-[#ED2939]">*</span>
+                        </label>
+                        <select
+                          value={item.isCustom ? '__custom__' : item.description}
+                          onChange={e => {
+                            if (e.target.value === '__custom__') {
+                              updateRepairItem(index, 'description', '')
+                              updateRepairItem(index, 'isCustom', true)
+                            } else {
+                              updateRepairItem(index, 'description', e.target.value)
+                              updateRepairItem(index, 'isCustom', false)
+                            }
+                          }}
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395] bg-white"
+                        >
+                          <option value="">Select repair type</option>
+                          {complaintTypes.map((type, i) => (
+                            <option key={i} value={type}>{type}</option>
+                          ))}
+                          <option value="__custom__">Other (type manually)</option>
+                        </select>
+                        {item.isCustom && (
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={e => updateRepairItem(index, 'description', e.target.value)}
+                            placeholder="Describe the repair"
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395] mt-2"
+                          />
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Cost (₹)</label>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            min="0"
+                            value={item.cost}
+                            onChange={e => updateRepairItem(index, 'cost', e.target.value)}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                          <input
+                            type="date"
+                            value={item.date}
+                            onChange={e => updateRepairItem(index, 'date', e.target.value)}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Technician</label>
+                        <input
+                          type="text"
+                          value={item.technician}
+                          onChange={e => updateRepairItem(index, 'technician', e.target.value)}
+                          placeholder="Who did the repair"
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addRepairItem}
+                  className="w-full border-2 border-dashed border-[#002395]/30 text-[#002395] rounded-xl py-2.5 text-sm font-semibold"
+                >
+                  <i className="fas fa-plus mr-2"></i>Add Repair Item
+                </button>
+                {repairItems.length > 0 && (
+                  <div className="bg-[#002395]/5 rounded-xl p-3 border border-[#002395]/20">
+                    <div className="flex justify-between text-sm font-semibold text-[#002395]">
+                      <span>Total Repair Cost</span>
+                      <span>₹{repairCost}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* CONDITION & GRADE */}
           <div>
             <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
@@ -654,77 +867,140 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
             </p>
             <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 md:p-6 mb-4">
               <div className="space-y-4">
-                {deviceChecklist.map((category, catIndex) => (
-                  <div key={catIndex}>
-                    <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-2 border-l-4 border-[#002395] pl-2">
-                      {category.name}
-                    </p>
-                    <div className="space-y-2">
-                      {category.items.map((item, itemIndex) => {
-                        const key = item.label.replace(/\s+/g, '_').toLowerCase()
-                        const value = conditionChecklist[key]
-                        
-                        return (
-                          <div key={itemIndex} className="flex items-center justify-between py-1.5">
-                            <span className="text-sm text-[#0f172a] flex-1 pr-3">{item.label}</span>
-                            
-                            {item.type === 'working_notworking' ? (
-                              <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleChecklistChange(key, 'Working')}
-                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                                    value === 'Working'
-                                      ? 'bg-green-500 text-white'
-                                      : 'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
-                                  Working
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleChecklistChange(key, 'Not Working')}
-                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                                    value === 'Not Working'
-                                      ? 'bg-[#ED2939] text-white'
-                                      : 'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
-                                  Not Working
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleChecklistChange(key, 'Yes')}
-                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                                    value === 'Yes'
-                                      ? 'bg-[#ED2939] text-white'
-                                      : 'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
-                                  Yes
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleChecklistChange(key, 'No')}
-                                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                                    value === 'No'
-                                      ? 'bg-green-500 text-white'
-                                      : 'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
-                                  No
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
+                {!formData.brand ? (
+                  <div className="text-center py-4 bg-gray-50 rounded-xl">
+                    <p className="text-sm text-gray-400">Select a brand to see condition checklist</p>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+                      formData.brand?.toLowerCase() === 'apple'
+                        ? 'bg-gray-100 text-gray-700'
+                        : 'bg-green-50 text-green-700'
+                    }`}>
+                      <i className={`fab ${formData.brand?.toLowerCase() === 'apple' ? 'fa-apple' : 'fa-android'} text-lg`}></i>
+                      <p className="text-sm font-semibold">
+                        {formData.brand?.toLowerCase() === 'apple' ? 'iPhone Checklist' : 'Android Checklist'}
+                      </p>
+                    </div>
+
+                    {(() => {
+                      const groupedCommon = groupByCategory(deviceChecklist.common || [])
+                      return Object.keys(groupedCommon).length > 0 && (
+                        <div className="space-y-4">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1">
+                            Common Checks
+                          </p>
+                          {Object.entries(groupedCommon).map(([category, items]) => (
+                            <div key={category} className="space-y-2">
+                              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide pl-1">
+                                {category}
+                              </p>
+                              <div className="space-y-2 pl-2">
+                                {items.map((item, idx) => {
+                                  const key = item.label.replace(/\s+/g, '_').toLowerCase()
+                                  const value = conditionChecklist[key]
+                                  return (
+                                    <div key={idx} className="flex items-center justify-between py-1.5 border-b border-gray-50/50">
+                                      <span className="text-sm text-[#0f172a] flex-1 pr-3">{item.label}</span>
+                                      {item.type === 'working_notworking' ? (
+                                        <div className="flex gap-2 flex-shrink-0">
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'Working')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'Working' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>Working</button>
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'Not Working')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'Not Working' ? 'bg-[#ED2939] text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>Not Working</button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex gap-2 flex-shrink-0">
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'Yes')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'Yes' ? 'bg-[#ED2939] text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>Yes</button>
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'No')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'No' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>No</button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+
+                    {(() => {
+                      const isApple = formData.brand?.toLowerCase() === 'apple'
+                      const specificItems = isApple
+                        ? (deviceChecklist.iphone || [])
+                        : (deviceChecklist.android || [])
+                      const groupedSpecific = groupByCategory(specificItems)
+                      return Object.keys(groupedSpecific).length > 0 ? (
+                        <div className="space-y-4 mt-4">
+                          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide border-b border-gray-100 pb-1">
+                            {isApple ? 'iPhone Specific Checks' : 'Android Specific Checks'}
+                          </p>
+                          {Object.entries(groupedSpecific).map(([category, items]) => (
+                            <div key={category} className="space-y-2">
+                              <p className="text-xs font-bold text-[#002395]/70 uppercase tracking-wide pl-1">
+                                {category}
+                              </p>
+                              <div className="space-y-2 pl-2">
+                                {items.map((item, idx) => {
+                                  const key = item.label.replace(/\s+/g, '_').toLowerCase()
+                                  const value = conditionChecklist[key]
+                                  return (
+                                    <div key={idx} className="flex items-center justify-between py-1.5 border-b border-gray-50/50">
+                                      <span className="text-sm text-[#0f172a] flex-1 pr-3">{item.label}</span>
+                                      {item.type === 'working_notworking' ? (
+                                        <div className="flex gap-2 flex-shrink-0">
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'Working')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'Working' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>Working</button>
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'Not Working')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'Not Working' ? 'bg-[#ED2939] text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>Not Working</button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex gap-2 flex-shrink-0">
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'Yes')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'Yes' ? 'bg-[#ED2939] text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>Yes</button>
+                                          <button type="button"
+                                            onClick={() => handleChecklistChange(key, 'No')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                                              value === 'No' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>No</button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null
+                    })()}
+                  </>
+                )}
               </div>
             </div>
 
@@ -836,6 +1112,13 @@ const SecondHandForm = ({ initialData, onSave, onCancel }) => {
             )}
           </button>
         </div>
+
+        <PrinterSelector
+          isOpen={showPrinter}
+          onClose={() => setShowPrinter(false)}
+          htmlContent={labelHTML}
+          title="Print Label"
+        />
 
       </div>
     </div>

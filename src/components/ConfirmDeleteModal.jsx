@@ -8,7 +8,7 @@ const ConfirmDeleteModal = ({
 }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl p-4 md:p-6 max-w-sm w-full mx-4 shadow-xl break-words">
         <div className="flex flex-col items-center text-center">
           <svg className="w-12 h-12 text-red-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

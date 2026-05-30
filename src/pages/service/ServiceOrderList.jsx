@@ -6,6 +6,7 @@ import Layout from '../../components/common/Layout';
 import ServiceOrderForm from './ServiceOrderForm';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
+import { creditWallet } from '../../utils/walletUtils';
 import NewSaleModal from '../../components/sales/NewSaleModal';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
@@ -171,6 +172,25 @@ const ServiceOrderList = () => {
       };
 
       await updateDoc(doc(db, 'service_orders', selectedOrderForComplete.id), updateData);
+
+      const order = selectedOrderForComplete
+      const hasDiscount = order.discount && Number(order.discount) > 0
+      const serviceProfit = (Number(order.estimatedPrice) || 0) -
+        (Number(order.rawMaterialCost) || 0) -
+        (Number(order.outsideLabourCost) || 0)
+
+      if (!hasDiscount && serviceProfit > 0 && order.customerId) {
+        const walletCredit = Math.round(serviceProfit * 0.01)
+        if (walletCredit > 0) {
+          await creditWallet(
+            order.customerId,
+            walletCredit,
+            'auto_credit',
+            order.id,
+            currentUser.uid
+          )
+        }
+      }
       
       const finalOrder = { ...selectedOrderForComplete, ...updateData };
       setOrders(orders.map(o => o.id === selectedOrderForComplete.id ? finalOrder : o));
@@ -212,7 +232,6 @@ const ServiceOrderList = () => {
           setRatingGenerating(false);
         }
       } else {
-        console.log("No phone number found, rating link skipped");
         setCompletedOrderForBill(finalOrder);
         setBillModalOpen(true);
       }
@@ -419,7 +438,7 @@ const ServiceOrderList = () => {
   const fab = (
     <button
       onClick={() => setShowModal(true)}
-      className="w-14 h-14 rounded-full bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden z-40"
+      className="w-14 h-14 rounded-full bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all"
       style={{ boxShadow: '0 4px 12px rgba(0, 35, 149, 0.18)' }}
       aria-label="New Service Order"
     >
@@ -562,30 +581,32 @@ return (
           return (
             <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-2">
+                  <div className="min-w-0">
                     <span className="text-xs font-bold text-[#002395] font-mono">{order.orderNumber}</span>
-                    <h3 className="text-lg font-bold text-[#0f172a] mt-1">{order.customerName}</h3>
+                    <h3 className="text-lg font-bold text-[#0f172a] mt-1 break-words">{order.customerName}</h3>
                   </div>
-                  <select
-                    value={order.status}
-                    onChange={e => handleQuickStatusChange(order, e.target.value)}
-                    onClick={e => e.stopPropagation()}
-                    className={`text-xs px-2 py-1 rounded-lg border-0 font-semibold focus:outline-none ${
-                      order.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                      order.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
-                      order.status === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
-                      order.status === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
-                      order.status === 'Awaiting Customer Approval' ? 'bg-purple-100 text-purple-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}
-                  >
-                    <option value="Received">Received</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Parts Awaiting">Parts Awaiting</option>
-                    <option value="Awaiting Customer Approval">Awaiting Customer Approval</option>
-                    <option value="Returned">Returned</option>
-                  </select>
+                  <div className="self-start sm:self-auto">
+                    <select
+                      value={order.status}
+                      onChange={e => handleQuickStatusChange(order, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg border-0 font-semibold focus:outline-none shadow-sm ${
+                        order.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                        order.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
+                        order.status === 'Parts Awaiting' ? 'bg-orange-100 text-orange-700' :
+                        order.status === 'Returned' ? 'bg-red-100 text-[#ED2939]' :
+                        order.status === 'Awaiting Customer Approval' ? 'bg-purple-100 text-purple-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}
+                    >
+                      <option value="Received">Received</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Parts Awaiting">Parts Awaiting</option>
+                      <option value="Awaiting Customer Approval">Awaiting Customer Approval</option>
+                      <option value="Returned">Returned</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="text-sm text-gray-500 flex items-center gap-2 mb-3">

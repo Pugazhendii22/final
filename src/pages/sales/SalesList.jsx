@@ -92,7 +92,7 @@ const SalesList = () => {
   const fab = (
     <button
       onClick={() => setShowModal(true)}
-      className="w-14 h-14 rounded-full bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all sm:hidden z-40"
+      className="w-14 h-14 rounded-full bg-[#002395] text-white flex items-center justify-center hover:bg-[#001a7a] transition-all"
       style={{ boxShadow: '0 4px 12px rgba(0, 35, 149, 0.18)' }}
       aria-label="New Sale"
     >

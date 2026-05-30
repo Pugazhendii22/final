@@ -441,7 +441,7 @@ const Layout = ({
 
       {/* ── FAB (Floating Action Button, list pages, mobile) ── */}
       {fab && (
-        <div className="md:hidden fixed bottom-20 right-4 z-35 print:hidden">
+        <div className="md:hidden fixed bottom-20 right-4 z-40 print:hidden">
           {fab}
         </div>
       )}

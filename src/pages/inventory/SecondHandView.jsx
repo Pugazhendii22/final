@@ -5,8 +5,10 @@ import { db, auth } from '../../firebase/firebase';
 import { useSettings } from '../../context/SettingsContext';
 import SecondHandForm from './SecondHandForm';
 import { getLabelNumber } from '../../utils/getLabelNumber';
-import { printLabel } from '../../utils/printLabel.jsx';
+import { printLabel, generateLabelHTML } from '../../utils/printLabel.jsx';
+import PrinterSelector from '../../components/PrinterSelector';
 import Layout from '../../components/common/Layout';
+import ImageModal from '../../components/common/ImageModal';
 
 const gradeColor = (g) => ({ 
   A: 'bg-green-100 text-green-700', 
@@ -14,6 +16,16 @@ const gradeColor = (g) => ({
   C: 'bg-orange-100 text-orange-700', 
   D: 'bg-red-100 text-red-700' 
 }[g] || 'bg-gray-100 text-[#64748b]');
+
+const groupByCategory = (items) => {
+  const grouped = {}
+  items.forEach(item => {
+    const cat = item.category || 'Display'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(item)
+  })
+  return grouped
+}
 
 const SecondHandView = () => {
   const { id } = useParams();
@@ -26,6 +38,12 @@ const SecondHandView = () => {
   const [showLabelDialog, setShowLabelDialog] = useState(false);
   const [labelInput, setLabelInput] = useState('');
   const [assigningLabel, setAssigningLabel] = useState(false);
+  const [showPrinter, setShowPrinter] = useState(false);
+  const [labelHTML, setLabelHTML] = useState('');
+  const [showImage, setShowImage] = useState({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
 
   const fetchMobile = async () => {
     try {
@@ -57,7 +75,7 @@ const SecondHandView = () => {
   const confirmAssign = async () => {
     setAssigningLabel(true);
     try {
-      await addDoc(collection(db, 'label_registry'), {
+      const labelData = {
         labelNumber: Number(labelInput),
         labelType: 'second_hand',
         referenceId: id,
@@ -77,8 +95,9 @@ const SecondHandView = () => {
           frontImageUrl: mobile.frontImageUrl || '', backImageUrl: mobile.backImageUrl || '',
           status: mobile.status || '', createdBy: mobile.createdBy || '', createdAt: mobile.createdAt || '',
         }
-      });
-      setLabelEntry({ labelNumber: Number(labelInput) });
+      };
+      await addDoc(collection(db, 'label_registry'), labelData);
+      setLabelEntry(labelData);
       setShowLabelDialog(false);
     } catch (err) { console.error(err); alert('Failed to assign label.'); }
     finally { setAssigningLabel(false); }
@@ -159,7 +178,11 @@ const SecondHandView = () => {
               </button>
               {labelEntry ? (
                 <button
-                  onClick={() => printLabel(labelEntry)}
+                  onClick={() => {
+                    const html = generateLabelHTML(labelEntry)
+                    setLabelHTML(html)
+                    setShowPrinter(true)
+                  }}
                   className="flex items-center gap-1.5 bg-[#ED2939]/10 text-[#ED2939] px-3 py-2 rounded-xl text-xs font-semibold"
                 >
                   <i className="fas fa-print"></i> Print #{labelEntry.labelNumber}
@@ -226,31 +249,163 @@ const SecondHandView = () => {
               <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
                 Device Checklist
               </p>
-              {deviceChecklist.map((category, catIndex) => (
-                <div key={catIndex} className="mb-4">
-                  <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-2 border-l-4 border-[#002395] pl-2">
-                    {category.name}
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {category.items.map((item, itemIndex) => {
-                      const key = item.label.replace(/\s+/g, '_').toLowerCase()
-                      const value = mobile?.conditionChecklist?.[key]
-                      if (!value) return null
-                      
-                      const isGood = value === 'Working' || value === 'No'
-                      
-                      return (
-                        <div key={itemIndex} className="flex items-center gap-2">
-                          <i className={`fas ${isGood ? 'fa-check-circle text-green-500' : 'fa-times-circle text-[#ED2939]'} text-sm flex-shrink-0`}></i>
-                          <span className="text-xs text-gray-600 truncate">{item.label}</span>
+
+              {(() => {
+                const isApple = mobile?.brand?.toLowerCase() === 'apple'
+                const specificItems = isApple
+                  ? (deviceChecklist.iphone || [])
+                  : (deviceChecklist.android || [])
+                const commonItems = deviceChecklist.common || []
+
+                return (
+                  <>
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl mb-3 self-start ${
+                      isApple ? 'bg-gray-100 text-gray-700' : 'bg-green-50 text-green-700'
+                    }`}>
+                      <i className={`fab ${isApple ? 'fa-apple' : 'fa-android'} text-sm`}></i>
+                      <span className="text-xs font-semibold">
+                        {isApple ? 'iPhone' : 'Android'}
+                      </span>
+                    </div>
+
+                    {(() => {
+                      const groupedCommon = groupByCategory(commonItems)
+                      return Object.keys(groupedCommon).length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-2 pl-2">
+                            Common Checks
+                          </p>
+                          <div className="space-y-3">
+                            {Object.entries(groupedCommon).map(([category, items]) => (
+                              <div key={category} className="space-y-1 pl-2">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{category}</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {items.map((item, idx) => {
+                                    const key = item.label.replace(/\s+/g, '_').toLowerCase()
+                                    const value = mobile?.conditionChecklist?.[key]
+                                    if (!value) return null
+                                    const isGood = value === 'Working' || value === 'No'
+                                    return (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <i className={`fas ${isGood ? 'fa-check-circle text-green-500' : 'fa-times-circle text-[#ED2939]'} text-sm flex-shrink-0`}></i>
+                                        <span className="text-xs text-gray-600 truncate">{item.label}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )
-                    })}
-                  </div>
-                </div>
-              ))}
+                    })()}
+
+                    {(() => {
+                      const groupedSpecific = groupByCategory(specificItems)
+                      return Object.keys(groupedSpecific).length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide border-b border-gray-100 pb-1 mb-2 pl-2">
+                            {isApple ? 'iPhone Specific' : 'Android Specific'}
+                          </p>
+                          <div className="space-y-3">
+                            {Object.entries(groupedSpecific).map(([category, items]) => (
+                              <div key={category} className="space-y-1 pl-2">
+                                <p className="text-[10px] font-bold text-[#002395]/70 uppercase tracking-wider">{category}</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {items.map((item, idx) => {
+                                    const key = item.label.replace(/\s+/g, '_').toLowerCase()
+                                    const value = mobile?.conditionChecklist?.[key]
+                                    if (!value) return null
+                                    const isGood = value === 'Working' || value === 'No'
+                                    return (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <i className={`fas ${isGood ? 'fa-check-circle text-green-500' : 'fa-times-circle text-[#ED2939]'} text-sm flex-shrink-0`}></i>
+                                        <span className="text-xs text-gray-600 truncate">{item.label}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </>
+                )
+              })()}
             </div>
           )}
+
+          {/* REPAIR & REFURBISHMENT */}
+          {mobile?.wasRepaired && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#ED2939] uppercase tracking-wide mb-3 border-l-4 border-[#ED2939] pl-3">
+                Repair &amp; Refurbishment
+              </p>
+              <div className="space-y-3 mb-3">
+                {mobile?.repairItems?.map((item, index) => (
+                  <div key={index} className="bg-gray-50 rounded-xl p-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-[#0f172a]">{item.description}</p>
+                        {item.technician && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            <i className="fas fa-user mr-1"></i>{item.technician}
+                          </p>
+                        )}
+                        {item.date && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            <i className="fas fa-calendar mr-1"></i>{item.date}
+                          </p>
+                        )}
+                      </div>
+                      <p className="text-sm font-bold text-[#ED2939] ml-3">₹{item.cost}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-[#ED2939]/5 rounded-xl p-3 border border-[#ED2939]/20">
+                <div className="flex justify-between text-sm font-bold text-[#ED2939]">
+                  <span>Total Repair Cost</span>
+                  <span>₹{mobile?.repairCost}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* COST & PROFIT */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
+              Cost &amp; Profit
+            </p>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Purchase Price</span>
+                <span className="font-medium">₹{mobile?.purchasePrice || 0}</span>
+              </div>
+              {mobile?.wasRepaired && mobile?.repairCost > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Repair Cost</span>
+                  <span className="font-medium text-[#ED2939]">₹{mobile?.repairCost}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-2">
+                <span>Total Cost</span>
+                <span>₹{mobile?.totalCost || mobile?.purchasePrice || 0}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Sale Price</span>
+                <span className="font-medium">₹{mobile?.salePrice || 0}</span>
+              </div>
+              <div className={`flex justify-between text-base font-bold border-t border-gray-100 pt-2 ${
+                (mobile?.profit || 0) >= 0 ? 'text-green-600' : 'text-[#ED2939]'
+              }`}>
+                <span>Profit</span>
+                <span>₹{mobile?.profit || 0}</span>
+              </div>
+            </div>
+          </div>
 
           {/* SELLER DETAILS */}
           {mobile?.sellerCustomerId && (
@@ -286,20 +441,44 @@ const SecondHandView = () => {
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { label: 'Front View', url: mobile?.photo1Url || mobile?.frontImageUrl },
-                { label: 'Back View',  url: mobile?.photo2Url || mobile?.backImageUrl },
-                { label: 'Left Side',  url: mobile?.photo3Url },
-                { label: 'Right Side', url: mobile?.photo4Url },
-                { label: 'Top/Bottom', url: mobile?.photo5Url },
-                { label: 'Additional', url: mobile?.photo6Url },
-                { label: 'ID Front',   url: mobile?.idCardFrontUrl },
-                { label: 'ID Back',    url: mobile?.idCardBackUrl },
+                { label: 'Front View', url: mobile?.photo1Url || mobile?.frontImageUrl, key: 'photo1' },
+                { label: 'Back View',  url: mobile?.photo2Url || mobile?.backImageUrl, key: 'photo2' },
+                { label: 'Left Side',  url: mobile?.photo3Url, key: 'photo3' },
+                { label: 'Right Side', url: mobile?.photo4Url, key: 'photo4' },
+                { label: 'Top/Bottom', url: mobile?.photo5Url, key: 'photo5' },
+                { label: 'Additional', url: mobile?.photo6Url, key: 'photo6' },
+                { label: 'ID Front',   url: mobile?.idCardFrontUrl, key: 'idFront' },
+                { label: 'ID Back',    url: mobile?.idCardBackUrl, key: 'idBack' },
               ].map((img, idx) => (
                 <div key={idx} className="flex flex-col">
                   {img.url ? (
-                    <a href={img.url} target="_blank" rel="noreferrer" className="block w-full">
-                      <img src={img.url} alt={img.label} className="w-full aspect-square object-cover rounded-xl shadow-sm border border-[#e2e8f0] hover:opacity-90 transition" />
-                    </a>
+                    showImage[img.key] ? (
+                      <div className="relative w-full aspect-square">
+                        <img
+                          src={img.url}
+                          alt={img.label}
+                          className="w-full h-full object-cover rounded-xl shadow-sm border border-[#e2e8f0] cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => {
+                            setViewerUrl(img.url);
+                            setViewerTitle(`${mobile?.brand} ${mobile?.model} - ${img.label}`);
+                            setViewerOpen(true);
+                          }}
+                        />
+                        <button
+                          onClick={() => setShowImage(prev => ({ ...prev, [img.key]: false }))}
+                          className="absolute top-1 right-1 bg-black/50 text-white text-xs px-2 py-1 rounded-lg"
+                        >
+                          Hide
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowImage(prev => ({ ...prev, [img.key]: true }))}
+                        className="w-full aspect-square border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-[#002395] text-sm font-medium"
+                      >
+                        <i className="fas fa-image"></i> View Photo
+                      </button>
+                    )
                   ) : (
                     <div className="w-full aspect-square flex items-center justify-center bg-[#f8fafc] text-[#64748b] rounded-xl border border-[#e2e8f0] border-dashed text-xs font-medium">No photo</div>
                   )}
@@ -335,6 +514,21 @@ const SecondHandView = () => {
         {showEdit && (
           <SecondHandForm initialData={mobile} onSave={handleUpdate} onCancel={() => setShowEdit(false)} />
         )}
+
+        {/* PRINTER SELECTOR */}
+        <PrinterSelector
+          isOpen={showPrinter}
+          onClose={() => setShowPrinter(false)}
+          htmlContent={labelHTML}
+          title="Print Label"
+        />
+
+        <ImageModal
+          isOpen={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          imageUrl={viewerUrl}
+          title={viewerTitle}
+        />
 
       </div>
     </Layout>

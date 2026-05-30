@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { generateInvoiceHTML } from '../../utils/generateInvoiceHTML';
+import { useSettings } from '../../context/SettingsContext';
 import Layout from '../../components/common/Layout';
 
 const SalesView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { shopDetails } = useSettings();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
@@ -39,7 +41,7 @@ const SalesView = () => {
       const freshSnap = await getDoc(doc(db, 'sales', id));
       const freshData = freshSnap.exists() ? { id: freshSnap.id, ...freshSnap.data() } : sale;
 
-      const invoiceHTML = generateInvoiceHTML(freshData);
+      const invoiceHTML = generateInvoiceHTML(freshData, shopDetails);
 
       const existing = document.getElementById('invoice-print-overlay');
       if (existing) existing.remove();
@@ -210,6 +212,20 @@ return (
               {sale?.balanceDue > 0 ? `₹${sale?.balanceDue}` : 'Fully Paid ✓'}
             </span>
           </div>
+          {sale?.totalProfit !== undefined && (
+            <div className="flex justify-between text-sm border-t border-gray-100 pt-2 mt-1">
+              <span className="text-gray-400">Profit</span>
+              <span className={`font-semibold ${(sale?.totalProfit || 0) >= 0 ? 'text-green-600' : 'text-[#ED2939]'}`}>
+                ₹{sale?.totalProfit || 0}
+              </span>
+            </div>
+          )}
+          {sale?.walletCredited > 0 && (
+            <div className="flex justify-between text-xs text-[#002395]">
+              <span><i className="fas fa-wallet mr-1"></i>Wallet Credited</span>
+              <span>+₹{sale?.walletCredited}</span>
+            </div>
+          )}
           {sale?.paymentMethod === 'Split' && (
             <div className="bg-gray-50 rounded-xl p-3 mt-2 space-y-1">
               <div className="flex justify-between text-xs text-gray-500">

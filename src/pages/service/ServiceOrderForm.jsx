@@ -6,7 +6,10 @@ import { useSettings } from '../../context/SettingsContext';
 import CustomerAutocomplete from '../../components/common/CustomerAutocomplete';
 import ImeiInput from '../../components/ImeiInput';
 import { getLabelNumber } from '../../utils/getLabelNumber';
-import { printLabel } from '../../utils/printLabel.jsx';
+import { uploadImageToCloudinary } from '../../utils/uploadImage';
+import { printLabel, generateLabelHTML } from '../../utils/printLabel.jsx';
+import { generateServiceJobCard } from '../../utils/generateServiceJobCard';
+import PrinterSelector from '../../components/PrinterSelector';
 
 const PatternLock = lazy(() => import('../../components/PatternLock').catch(() => ({ default: () => <div className="text-red-500">Failed to load PatternLock</div> })));
 
@@ -21,7 +24,7 @@ const generateSerialNumber = () => {
 
 const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
   const { currentUser, userName, userRole } = useAuth();
-  const { complaintTypes: complaintTypeOptions = [], accessories: accessoryOptions = [], brands: brandOptions = [], models: modelOptions = {} } = useSettings();
+  const { complaintTypes: complaintTypeOptions = [], accessories: accessoryOptions = [], brands: brandOptions = [], models: modelOptions = {}, shopDetails } = useSettings();
   const [staffOptions, setStaffOptions] = useState([]);
   const [customModel, setCustomModel] = useState('');
   const [isCustomModel, setIsCustomModel] = useState(false);
@@ -124,8 +127,10 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
   const [assignedLabelNumber, setAssignedLabelNumber] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [localId, setLocalId] = useState(initialData?.id || null);
-  const [saveStatus, setSaveStatus] = useState('idle'); // idle, saving, saved
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPrinter, setShowPrinter] = useState(false);
+  const [labelHTML, setLabelHTML] = useState('');
 
   useEffect(() => {
     if (localId) {
@@ -208,30 +213,10 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
 
   const handleUpload = async (file) => {
     if (!file) return;
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-    if (!cloudName || !uploadPreset || cloudName.includes('paste_')) {
-      setError("Cloudinary configuration missing in .env");
-      return;
-    }
-
     setUploading(true);
-    const data = new FormData();
-    data.append('file', file);
-    data.append('upload_preset', uploadPreset);
-
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: data,
-      });
-      const fileData = await res.json();
-      if (fileData.secure_url) {
-        setFormData(prev => ({ ...prev, imageUrl: fileData.secure_url }));
-      } else {
-        throw new Error(fileData.error?.message || 'Upload failed');
-      }
+      const url = await uploadImageToCloudinary(file);
+      setFormData(prev => ({ ...prev, imageUrl: url }));
     } catch (err) {
       console.error(err);
       setError('Image upload failed: ' + err.message);
@@ -300,6 +285,10 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
       if (finalData.lockType !== 'Pattern') finalData.lockPattern = [];
       if (!['PIN', 'Password', 'Other'].includes(finalData.lockType)) finalData.lockHint = '';
 
+      finalData.serviceProfit = (Number(formData.estimatedPrice) || 0) -
+        (Number(formData.rawMaterialCost) || 0) -
+        (Number(formData.outsideLabourCost) || 0);
+
       if (localId) finalData.id = localId;
 
       const newId = await onSave(finalData);
@@ -362,6 +351,9 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
       finalData.expectedCompletionAt = new Date(formData.expectedCompletionAt);
       if (finalData.lockType !== 'Pattern') finalData.lockPattern = [];
       if (!['PIN', 'Password', 'Other'].includes(finalData.lockType)) finalData.lockHint = '';
+      finalData.serviceProfit = (Number(formData.estimatedPrice) || 0) -
+        (Number(formData.rawMaterialCost) || 0) -
+        (Number(formData.outsideLabourCost) || 0);
       finalData.serialNumber = finalSerialNumber;
 
       if (localId) finalData.id = localId;
@@ -464,38 +456,53 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
     }
   };
 
-  const handlePrintLabel = () => {
-    if (labelAssigned && assignedLabelNumber) {
-      // Print with assigned label number
-      printLabel({
-        labelType: 'service_order',
-        labelNumber: assignedLabelNumber,
-        data: {
-          customerName: formData.customerName || '',
-          brand: formData.brand || '',
-          model: formData.model || '',
-          complaintTypes: formData.complaintTypes || [],
-          estimatedPrice: Number(formData.estimatedPrice || 0),
-          orderNumber: formData.orderNumber || initialData?.orderNumber || '',
-          imei1: formData.imei1 || '',
-        }
-      });
-    } else {
-      // Print without assigned label — use orderNumber as barcode fallback
-      printLabel({
-        labelType: 'service_order',
-        labelNumber: null,
-        data: {
-          customerName: formData.customerName || '',
-          brand: formData.brand || '',
-          model: formData.model || '',
-          complaintTypes: formData.complaintTypes || [],
-          estimatedPrice: Number(formData.estimatedPrice || 0),
-          orderNumber: formData.orderNumber || initialData?.orderNumber || '',
-          imei1: formData.imei1 || '',
-        }
-      });
+  const handlePrintJobCard = () => {
+    const orderData = {
+      orderNumber: formData.orderNumber || initialData?.orderNumber || '',
+      customerName: formData.customerName,
+      customerPhone: formData.customerPhone,
+      alternatePhone: formData.alternatePhone,
+      brand: formData.brand,
+      model: formData.model,
+      colour: formData.colour,
+      imei1: formData.imei1,
+      imei2: formData.imei2,
+      lockType: formData.lockType,
+      technicianName: formData.technicianName,
+      complaintTypes: formData.complaintTypes,
+      otherComplaint: formData.otherComplaint,
+      problemDetails: formData.problemDetails,
+      accessoriesCollected: formData.accessories,
+      estimatedPrice: formData.estimatedPrice,
+      advancePaid: formData.advancePaid,
+      assignedLabelNumber: assignedLabelNumber
     }
+    const html = generateServiceJobCard(orderData, shopDetails)
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(html)
+    printWindow.document.close()
+    setTimeout(() => {
+      printWindow.print()
+    }, 500)
+  }
+
+  const handlePrintLabel = () => {
+    const labelData = {
+      labelType: 'service_order',
+      labelNumber: labelAssigned ? assignedLabelNumber : null,
+      data: {
+        customerName: formData.customerName || '',
+        brand: formData.brand || '',
+        model: formData.model || '',
+        complaintTypes: formData.complaintTypes || [],
+        estimatedPrice: Number(formData.estimatedPrice || 0),
+        orderNumber: formData.orderNumber || initialData?.orderNumber || '',
+        imei1: formData.imei1 || '',
+      }
+    }
+    const html = generateLabelHTML(labelData)
+    setLabelHTML(html)
+    setShowPrinter(true)
   };
 
   if (!currentUser) {
@@ -880,6 +887,15 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
           </button>
         </div>
         
+        {(saveStatus === 'saved' || saveStatus.includes('Assigned ✓') || initialData) && (
+          <button
+            type="button"
+            onClick={handlePrintJobCard}
+            className="w-full mt-3 bg-amber-500 text-white rounded-xl py-2.5 text-sm font-semibold"
+          >
+            <i className="fas fa-file-alt mr-2"></i> Print Job Card
+          </button>
+        )}
         {!initialData && (
           <button
             type="button"
@@ -896,11 +912,18 @@ const ServiceOrderForm = ({ initialData, onSave, onCancel }) => {
             )}
           </button>
         )}
-      </div>
-
     </div>
   </div>
-);
+
+      <PrinterSelector
+        isOpen={showPrinter}
+        onClose={() => setShowPrinter(false)}
+        htmlContent={labelHTML}
+        title="Print Label"
+      />
+
+    </div>
+  );
   } catch (err) {
     console.error("Error rendering ServiceOrderForm:", err);
     return (

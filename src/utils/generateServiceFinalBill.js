@@ -1,25 +1,25 @@
-export const generateInvoiceHTML = (sale, shopDetails) => {
+export const generateServiceFinalBill = (order, shopDetails) => {
   const shop = shopDetails || {}
-  const items = sale.items || []
-  const grandTotal = sale.totalAmount || 0
-  const balanceDue = sale.balanceDue || 0
+  const finalAmount = order.estimatedPrice || 0
+  const advance = order.advancePaid || 0
+  const balance = finalAmount - advance
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Invoice - ${sale.invoiceNumber}</title>
+      <title>Final Bill - ${order.orderNumber}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; }
         @page { size: A4 portrait; margin: 8mm; }
-        .page { width: 210mm; min-height: 148mm; padding: 0; margin: 0 auto; }
+        .page { width: 210mm; min-height: 148mm; padding: 0; margin: 0 auto; background: #fff; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
         .header-left { flex: 1; }
         .header-center { flex: 1; text-align: center; }
         .header-right { flex: 1; text-align: right; font-size: 10px; }
-        .doc-title { font-size: 18px; font-weight: bold; }
+        .doc-title { font-size: 18px; font-weight: bold; text-align: center; }
         .shop-name { font-size: 16px; font-weight: 900; text-transform: uppercase; }
         .shop-info { font-size: 9px; line-height: 1.6; color: #333; margin-top: 2px; }
         .two-col { display: flex; border: 1px solid #000; margin-bottom: 6px; }
@@ -29,14 +29,10 @@ export const generateInvoiceHTML = (sale, shopDetails) => {
         .field-row { display: flex; margin-bottom: 4px; font-size: 10px; }
         .field-label { font-weight: bold; min-width: 100px; flex-shrink: 0; }
         .field-value { flex: 1; border-bottom: 1px solid #ccc; padding-left: 4px; min-height: 14px; }
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-        .items-table th { background: #f0f0f0; border: 1px solid #000; padding: 5px 6px; font-size: 10px; font-weight: bold; text-align: center; }
-        .items-table td { border: 1px solid #000; padding: 5px 6px; font-size: 10px; vertical-align: top; }
-        .items-table .col-sn { text-align: center; width: 30px; }
-        .items-table .col-qty { text-align: center; width: 40px; }
-        .items-table .col-price { text-align: right; width: 80px; }
-        .items-table .col-amount { text-align: right; width: 80px; }
-        .totals-row td { font-weight: bold; }
+        .fault-solution { display: flex; border: 1px solid #000; margin-bottom: 6px; }
+        .fault-col { flex: 1; padding: 8px; border-right: 1px solid #000; }
+        .solution-col { flex: 1; padding: 8px; }
+        .content-text { font-size: 10px; line-height: 1.6; min-height: 30px; }
         .notice-contact { display: flex; border: 1px solid #000; margin-bottom: 6px; }
         .notice-col { flex: 1; padding: 8px; border-right: 1px solid #000; }
         .contact-col { flex: 1; padding: 8px; }
@@ -47,8 +43,12 @@ export const generateInvoiceHTML = (sale, shopDetails) => {
         .sig-col { flex: 1; padding: 8px; border-right: 1px solid #000; font-size: 9px; }
         .sig-col:last-child { border-right: none; }
         .sig-line { border-bottom: 1px solid #000; margin-top: 20px; margin-bottom: 4px; width: 80%; }
-        .shop-stamp { text-align: right; font-size: 10px; font-weight: bold; padding: 8px; }
+        .shop-stamp { text-align: right; font-size: 10px; font-weight: bold; padding: 8px; flex: 1; }
         .thank-you { text-align: center; font-size: 10px; padding: 6px; border: 1px solid #000; border-top: none; font-style: italic; }
+        .payment-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        .payment-table td { border: 1px solid #000; padding: 5px 8px; font-size: 10px; }
+        .payment-table .total-row td { font-weight: bold; font-size: 12px; }
+        .payment-table .balance-row td { font-weight: bold; font-size: 11px; color: ${balance > 0 ? 'red' : 'green'}; }
       </style>
     </head>
     <body>
@@ -65,99 +65,116 @@ export const generateInvoiceHTML = (sale, shopDetails) => {
             ${shop.gstin ? `<div style="font-size:9px;margin-top:3px;">GSTIN: ${shop.gstin}</div>` : ''}
           </div>
           <div class="header-center">
-            <div class="doc-title">Invoice</div>
-            <div style="font-size:10px;color:#555;margin-top:2px;">Sale Receipt</div>
+            <div class="doc-title">Service Invoice</div>
+            <div style="font-size:10px;color:#555;margin-top:2px;">Final Bill</div>
           </div>
           <div class="header-right">
-            <div style="font-weight:bold;font-size:10px;">Bill No: ${sale.invoiceNumber}</div>
+            <div style="font-weight:bold;font-size:10px;">NO: ${order.orderNumber}</div>
             <div style="font-size:9px;margin-top:4px;">
-              Date: ${sale.createdAt?.toDate ? new Date(sale.createdAt.seconds * 1000).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}
+              Received: ${order.receivedAt?.toDate?.()?.toLocaleDateString('en-IN') || ''}
             </div>
-            <div style="font-size:9px;margin-top:2px;">Payment: ${sale.paymentMethod || 'Cash'}</div>
+            <div style="font-size:9px;margin-top:2px;">
+              Completed: ${order.actualCompletedAt?.toDate?.()?.toLocaleDateString('en-IN') || new Date().toLocaleDateString('en-IN')}
+            </div>
           </div>
         </div>
 
         <div class="two-col">
           <div class="col-left">
-            <div class="section-title">Customer Details</div>
+            <div class="section-title">Customer Info</div>
             <div class="field-row">
               <span class="field-label">Name</span>
-              <span class="field-value">${sale.customerName || ''}</span>
+              <span class="field-value">${order.customerName || ''}</span>
             </div>
             <div class="field-row">
               <span class="field-label">Mobile</span>
-              <span class="field-value">${sale.customerPhone || ''}</span>
+              <span class="field-value">${order.customerPhone || ''}</span>
             </div>
-            ${sale.customerAddress ? `
-            <div class="field-row">
-              <span class="field-label">Address</span>
-              <span class="field-value">${sale.customerAddress}</span>
-            </div>` : ''}
           </div>
           <div class="col-right">
-            <div class="section-title">Payment Info</div>
+            <div class="section-title">Device Info</div>
             <div class="field-row">
-              <span class="field-label">Method</span>
-              <span class="field-value">${sale.paymentMethod || 'Cash'}</span>
+              <span class="field-label">Brand / Model</span>
+              <span class="field-value">${order.brand || ''} ${order.model || ''}</span>
             </div>
             <div class="field-row">
-              <span class="field-label">Amount Paid</span>
-              <span class="field-value">Rs. ${sale.amountPaid || 0}</span>
+              <span class="field-label">IMEI</span>
+              <span class="field-value">${order.imei1 || ''}</span>
             </div>
-            ${balanceDue > 0 ? `
             <div class="field-row">
-              <span class="field-label">Balance Due</span>
-              <span class="field-value" style="color:red;font-weight:bold;">Rs. ${balanceDue}</span>
-            </div>` : `
-            <div class="field-row">
-              <span class="field-label">Status</span>
-              <span class="field-value" style="color:green;font-weight:bold;">\u2713 FULLY PAID</span>
-            </div>`}
+              <span class="field-label">Technician</span>
+              <span class="field-value">${order.technicianName || ''}</span>
+            </div>
           </div>
         </div>
 
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th class="col-sn">S.N.</th>
-              <th>Description</th>
-              <th class="col-qty">QTY</th>
-              <th class="col-price">PRICE</th>
-              <th class="col-amount">AMOUNT</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items.map((item, i) => `
-              <tr>
-                <td class="col-sn">${i + 1}</td>
-                <td>
-                  <strong>${item.name || ''}</strong>
-                  ${item.imei ? `<br><span style="font-size:9px;">IMEI: ${item.imei}</span>` : ''}
-                </td>
-                <td class="col-qty">${item.quantity || 1}</td>
-                <td class="col-price">Rs.${Number(item.unitPrice || 0).toLocaleString('en-IN')}</td>
-                <td class="col-amount">Rs.${Number(item.total || 0).toLocaleString('en-IN')}</td>
-              </tr>
-            `).join('')}
-            ${items.length < 3 ? Array(3 - items.length).fill('<tr><td class="col-sn"></td><td></td><td class="col-qty"></td><td class="col-price"></td><td class="col-amount"></td></tr>').join('') : ''}
-            <tr class="totals-row">
-              <td colspan="4" style="text-align:right;border-left:none;">Grand Total:</td>
-              <td class="col-amount" style="font-size:12px;">Rs.${Number(grandTotal).toLocaleString('en-IN')}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="fault-solution">
+          <div class="fault-col">
+            <div class="section-title">Issues Reported</div>
+            <div class="content-text">
+              ${(order.complaintTypes || []).map(c => `\u2022 ${c}`).join('<br>')}
+              ${order.otherComplaint ? `<br>\u2022 ${order.otherComplaint}` : ''}
+            </div>
+          </div>
+          <div class="solution-col">
+            <div class="section-title">Work Done / Solution</div>
+            <div class="content-text">
+              ${order.suggestions || 'Service completed successfully.'}
+            </div>
+          </div>
+        </div>
 
-        <div style="border:1px solid #000;padding:6px 8px;margin-bottom:6px;font-size:9px;">
+        <div style="border: 1px solid #000; margin-bottom: 6px;">
+          <div style="padding: 6px 8px; border-bottom: 1px solid #000; font-weight: bold; font-size: 11px;">
+            Payment Summary
+          </div>
+          <table class="payment-table" style="border: none; margin: 0;">
+            <tr>
+              <td style="border-top:none;border-left:none;">Service Charge</td>
+              <td style="border-top:none;border-right:none;text-align:right;">Rs. ${order.estimatedPrice || 0}</td>
+            </tr>
+            ${order.rawMaterialCost > 0 ? `
+            <tr>
+              <td style="border-left:none;">Parts / Material Cost</td>
+              <td style="border-right:none;text-align:right;">Rs. ${order.rawMaterialCost}</td>
+            </tr>` : ''}
+            ${order.outsideLabourCost > 0 ? `
+            <tr>
+              <td style="border-left:none;">Outside Labour</td>
+              <td style="border-right:none;text-align:right;">Rs. ${order.outsideLabourCost}</td>
+            </tr>` : ''}
+            <tr class="total-row">
+              <td style="border-left:none;">Total Amount</td>
+              <td style="border-right:none;text-align:right;">Rs. ${finalAmount}</td>
+            </tr>
+            ${advance > 0 ? `
+            <tr>
+              <td style="border-left:none;">Advance Paid</td>
+              <td style="border-right:none;text-align:right;color:green;">- Rs. ${advance}</td>
+            </tr>` : ''}
+            <tr class="balance-row">
+              <td style="border-left:none;border-bottom:none;">
+                ${balance > 0 ? 'Balance Due' : 'Fully Paid'}
+              </td>
+              <td style="border-right:none;border-bottom:none;text-align:right;">
+                ${balance > 0 ? `Rs. ${balance}` : '\u2713 PAID'}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="border: 1px solid #000; padding: 6px 8px; margin-bottom: 6px; font-size: 9px;">
           <strong>Warranty: </strong>${shop.warranty_text || 'Physical and liquid damages will not be covered under warranty terms.'}
         </div>
 
         <div class="notice-contact">
           <div class="notice-col">
-            <div class="section-title">Terms & Conditions</div>
-            <div class="notice-item">1. Goods once sold will not be taken back.</div>
-            <div class="notice-item">2. Warranty as per manufacturer terms.</div>
-            <div class="notice-item">3. Physical and liquid damage not covered.</div>
-            <div class="notice-item">4. Please check goods before leaving.</div>
+            <div class="section-title">User Notice</div>
+            ${(shop.user_notice || [
+              'Please inspect your device carefully when collecting.',
+              'Physical and liquid damage not covered under warranty.',
+              'Keep this invoice for future reference.'
+            ]).map((n, i) => `<div class="notice-item">${i+1}. ${n}</div>`).join('')}
           </div>
           <div class="contact-col">
             <div class="section-title">Contact Us</div>
@@ -185,6 +202,11 @@ export const generateInvoiceHTML = (sale, shopDetails) => {
             <div>Customer Signature:</div>
             <div class="sig-line"></div>
             <div style="font-size:9px;">Goods received in good condition</div>
+          </div>
+          <div class="sig-col">
+            <div>${shop.technician_label || 'Repair Engineer'}:</div>
+            <div style="font-size:10px;font-weight:bold;margin-top:4px;">${order.technicianName || ''}</div>
+            <div class="sig-line"></div>
           </div>
           <div class="shop-stamp">
             <div>${shop.name || 'THE FRENCH MOBILES'}</div>

@@ -25,6 +25,9 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         total: item.quantity * item.unitPrice,
+        purchaseCost: 0,
+        repairCost: 0,
+        itemProfit: item.unitPrice,
         imei: ''
       })) : [],
       discount: 0,
@@ -78,12 +81,12 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
   // Recalculate discount when items or discount category changes
   useEffect(() => {
     if (!discountCategory) return;
-    const subtotal = formData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+    const estProfit = formData.items.reduce((sum, item) => sum + (Number(item.itemProfit) || 0), 0);
     let percentage = 0;
     if (discountCategory === 'family') percentage = 15;
     else if (discountCategory === 'friends') percentage = 10;
     else if (discountCategory === 'regular') percentage = 5;
-    const discountAmount = Math.round((subtotal * percentage) / 100);
+    const discountAmount = Math.round((estProfit * percentage) / 100);
     setFormData(prev => ({ ...prev, discount: discountAmount }));
   }, [formData.items, discountCategory]);
 
@@ -110,22 +113,22 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
       return;
     }
 
-    // Calculate discount based on current total
-    const currentTotal = formData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+    // Calculate discount based on estimated profit
+    const estProfit = formData.items.reduce((sum, item) => sum + (Number(item.itemProfit) || 0), 0);
     
     let percentage = 0;
     if (category === 'family') percentage = 15;
     else if (category === 'friends') percentage = 10;
     else if (category === 'regular') percentage = 5;
 
-    const discountAmount = Math.round((currentTotal * percentage) / 100);
+    const discountAmount = Math.round((estProfit * percentage) / 100);
     setFormData(prev => ({ ...prev, discount: discountAmount }));
   };
 
   const addItem = (type) => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { type, itemId: '', name: '', quantity: 1, unitPrice: 0, total: 0, imei: '' }]
+      items: [...prev.items, { type, itemId: '', name: '', quantity: 1, unitPrice: 0, total: 0, purchaseCost: 0, repairCost: 0, itemProfit: 0, imei: '' }]
     }));
   };
 
@@ -148,21 +151,32 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
           if (sh) {
             item.name = `${sh.brand} ${sh.model}`;
             item.unitPrice = Number(sh.salePrice || 0);
+            item.purchaseCost = Number(sh.purchasePrice || 0);
+            item.repairCost = Number(sh.repairCost || 0);
             item.imei = sh.imei1 || '';
-            item.quantity = 1; // Can't change quantity for second hand
+            item.quantity = 1;
+            item.itemProfit = item.unitPrice - item.purchaseCost - item.repairCost;
           }
         } else if (item.type === 'New') {
           const prod = products.find(p => p.id === value);
           if (prod) {
             item.name = prod.name;
             item.unitPrice = Number(prod.salePrice || prod.price || 0);
+            item.purchaseCost = Number(prod.purchasePrice || 0);
+            item.repairCost = 0;
             item.quantity = 1;
+            item.itemProfit = item.unitPrice - item.purchaseCost;
           }
+        } else if (item.type === 'Service') {
+          item.purchaseCost = 0;
+          item.repairCost = 0;
+          item.itemProfit = item.unitPrice;
         }
       }
 
       if (field === 'quantity' || field === 'unitPrice' || field === 'itemId') {
         item.total = item.quantity * item.unitPrice;
+        item.itemProfit = (item.unitPrice - item.purchaseCost - item.repairCost) * item.quantity;
       }
 
       newItems[index] = item;
@@ -175,6 +189,10 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
   const walletUsed = Number(useWalletAmount) || 0;
   const finalAmount = totalAmount - walletUsed;
   const balanceDue = finalAmount - (Number(formData.amountPaid) || 0);
+  const totalItemProfit = formData.items.reduce((sum, item) =>
+    sum + (Number(item.itemProfit) || 0), 0
+  );
+  const finalProfit = totalItemProfit - (Number(formData.discount) || 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -205,7 +223,9 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
         finalAmount,
         balanceDue,
         discountCategory: discountCategory || 'manual',
-        createdBy: currentUser.uid 
+        createdBy: currentUser.uid,
+        totalProfit: finalProfit,
+        walletCredited: (Number(formData.discount) > 0) ? 0 : Math.round(finalProfit * 0.01)
       };
       delete finalData.linkedServiceOrderNumber;
       await onSave(finalData);
@@ -348,6 +368,12 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
                         </option>
                       ))}
                     </select>
+                  )}
+                  {item.type === 'Second-hand' && item.repairCost > 0 && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      <i className="fas fa-wrench mr-1"></i>
+                      Includes repair cost: ₹{item.repairCost}
+                    </p>
                   )}
                   <div className="grid grid-cols-3 gap-2">
                     <div>
@@ -582,6 +608,12 @@ const SalesForm = ({ onSave, onCancel, prefillData }) => {
           <span>Balance Due</span>
           <span className={balanceDue > 0 ? 'text-[#ED2939]' : 'text-green-600'}>
             {balanceDue > 0 ? `₹${balanceDue}` : 'Fully Paid ✓'}
+          </span>
+        </div>
+        <div className="flex justify-between text-xs border-t border-gray-100 pt-2 mt-1">
+          <span className="text-gray-400">Est. Profit</span>
+          <span className={`font-semibold ${finalProfit >= 0 ? 'text-green-600' : 'text-[#ED2939]'}`}>
+            ₹{finalProfit}
           </span>
         </div>
       </div>

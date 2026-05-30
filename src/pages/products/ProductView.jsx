@@ -4,8 +4,10 @@ import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs } fro
 import { db, auth } from '../../firebase/firebase';
 import ProductForm from './ProductForm';
 import { getLabelNumber } from '../../utils/getLabelNumber';
-import { printLabel } from '../../utils/printLabel.jsx';
+import { printLabel, generateLabelHTML } from '../../utils/printLabel.jsx';
+import PrinterSelector from '../../components/PrinterSelector';
 import Layout from '../../components/common/Layout';
+import ImageModal from '../../components/common/ImageModal';
 
 const ProductView = () => {
   const { id } = useParams();
@@ -17,8 +19,14 @@ const ProductView = () => {
   const [showLabelDialog, setShowLabelDialog] = useState(false);
   const [labelInput, setLabelInput] = useState('');
   const [assigningLabel, setAssigningLabel] = useState(false);
+  const [showPrinter, setShowPrinter] = useState(false);
+  const [labelHTML, setLabelHTML] = useState('');
+  const [showProductImage, setShowProductImage] = useState(false);
   const [modelSearchQuery, setModelSearchQuery] = useState('');
   const [showAllModels, setShowAllModels] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
 
   const fetchProduct = async () => {
     try {
@@ -49,7 +57,7 @@ const ProductView = () => {
   const confirmAssign = async () => {
     setAssigningLabel(true);
     try {
-      await addDoc(collection(db, 'label_registry'), {
+      const labelData = {
         labelNumber: Number(labelInput),
         labelType: 'product',
         referenceId: id,
@@ -69,8 +77,9 @@ const ProductView = () => {
           createdBy: product.createdBy || '',
           createdAt: product.createdAt || '',
         }
-      });
-      setLabelEntry({ labelNumber: Number(labelInput) });
+      };
+      await addDoc(collection(db, 'label_registry'), labelData);
+      setLabelEntry(labelData);
       setShowLabelDialog(false);
     } catch (err) { console.error(err); alert('Failed to assign label.'); }
     finally { setAssigningLabel(false); }
@@ -139,7 +148,11 @@ const ProductView = () => {
               </button>
               {labelEntry ? (
                 <button
-                  onClick={() => printLabel(labelEntry)}
+                  onClick={() => {
+                    const html = generateLabelHTML(labelEntry)
+                    setLabelHTML(html)
+                    setShowPrinter(true)
+                  }}
                   className="flex items-center gap-1.5 bg-[#ED2939]/10 text-[#ED2939] px-3 py-2 rounded-xl text-xs font-semibold"
                 >
                   <i className="fas fa-print"></i> Print #{labelEntry.labelNumber}
@@ -241,11 +254,33 @@ const ProductView = () => {
               <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
                 Photo
               </p>
-              <img
-                src={product?.imageUrl}
-                alt={product?.name}
-                className="w-full h-48 object-contain rounded-xl"
-              />
+              {showProductImage ? (
+                <div className="relative">
+                  <img
+                    src={product?.imageUrl}
+                    alt={product?.name}
+                    className="w-full h-48 object-contain rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => {
+                      setViewerUrl(product?.imageUrl);
+                      setViewerTitle(product?.name || 'Product Photo');
+                      setViewerOpen(true);
+                    }}
+                  />
+                  <button
+                    onClick={() => setShowProductImage(false)}
+                    className="absolute top-1 right-1 bg-black/50 text-white text-xs px-2 py-1 rounded-lg"
+                  >
+                    Hide
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowProductImage(true)}
+                  className="w-full h-16 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-[#002395] text-sm font-medium"
+                >
+                  <i className="fas fa-image"></i> View Photo
+                </button>
+              )}
             </div>
           )}
 
@@ -274,6 +309,20 @@ const ProductView = () => {
         {showEdit && (
           <ProductForm initialData={product} onSave={handleUpdate} onCancel={() => setShowEdit(false)} />
         )}
+
+        <PrinterSelector
+          isOpen={showPrinter}
+          onClose={() => setShowPrinter(false)}
+          htmlContent={labelHTML}
+          title="Print Label"
+        />
+
+        <ImageModal
+          isOpen={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          imageUrl={viewerUrl}
+          title={viewerTitle}
+        />
 
       </div>
     </Layout>

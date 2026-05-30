@@ -80,9 +80,20 @@ const NewSaleModal = ({ isOpen = true, modalOnly = false, onClose, prefillData, 
     if (walletUsed > 0 && customerId) {
       await debitWallet(customerId, walletUsed, 'used_in_sale', docRef.id, currentUser.uid);
     }
-    const discount = Number(data.discount) || 0;
-    if (discount === 0 && customerId) {
-      await creditWallet(customerId, 5, 'auto_credit', docRef.id, currentUser.uid);
+    const hasDiscount = Number(data.discount) > 0
+    const profit = data.totalProfit || 0
+
+    if (!hasDiscount && profit > 0 && customerId) {
+      const walletCredit = Math.round(profit * 0.01)
+      if (walletCredit > 0) {
+        await creditWallet(
+          customerId,
+          walletCredit,
+          'auto_credit',
+          docRef.id,
+          currentUser.uid
+        )
+      }
     }
 
     if (data.linkedServiceOrderId) {

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import Layout from '../../components/common/Layout';
-import { printLabel } from '../../utils/printLabel.jsx';
+import { printLabel, generateLabelHTML } from '../../utils/printLabel.jsx';
+import PrinterSelector from '../../components/PrinterSelector';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
@@ -15,6 +16,8 @@ const LabelRegistryList = () => {
   const [newLabelNum, setNewLabelNum] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [showPrinter, setShowPrinter] = useState(false);
+  const [labelHTML, setLabelHTML] = useState('');
 
   const fetchLabels = async () => {
     try {
@@ -94,7 +97,11 @@ const LabelRegistryList = () => {
                   </div>
                   <div className="text-xs text-[#64748b] whitespace-nowrap">{l.assignedAt ? new Date(l.assignedAt).toLocaleDateString() : '-'}</div>
                   <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <button onClick={() => printLabel(l)} className="bg-[#002395] text-white px-3 py-2 rounded-2xl text-xs font-semibold hover:bg-[#001a7a] transition-colors">Print</button>
+                    <button onClick={() => {
+                      const html = generateLabelHTML(l)
+                      setLabelHTML(html)
+                      setShowPrinter(true)
+                    }} className="bg-[#002395] text-white px-3 py-2 rounded-2xl text-xs font-semibold hover:bg-[#001a7a] transition-colors">Print</button>
                     <button onClick={() => handleEditClick(l)} className="border border-[#e2e8f0] text-[#002395] px-3 py-2 rounded-2xl text-xs font-semibold hover:bg-blue-50 transition-colors">Edit</button>
                     {userRole === 'admin' && (
                       <button
@@ -158,6 +165,13 @@ const LabelRegistryList = () => {
           deleting={deleting}
           title="Delete Label"
           message="Are you sure you want to delete this label entry? This action cannot be undone."
+        />
+
+        <PrinterSelector
+          isOpen={showPrinter}
+          onClose={() => setShowPrinter(false)}
+          htmlContent={labelHTML}
+          title="Print Label"
         />
       </div>
     </Layout>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useSettings } from '../../context/SettingsContext'
@@ -21,8 +21,40 @@ const SettingsPage = () => {
   const [selectedModelBrand, setSelectedModelBrand] = useState('')
   const [newModelText, setNewModelText] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-  const [selectedChecklistCategory, setSelectedChecklistCategory] = useState(0)
+  const [checklistTab, setChecklistTab] = useState('common')
+  const [selectedCategory, setSelectedCategory] = useState('Display')
+  const [customCategories, setCustomCategories] = useState([])
   const [newChecklistItem, setNewChecklistItem] = useState({ label: '', type: 'working_notworking' })
+  const [shopForm, setShopForm] = useState(settings.shop_details || {
+    name: "THE FRENCH MOBILES",
+    address: "225, Thiruvalluvar Salai, Iyyanar Nagar, Raja Nagar, Pudupalaiyam, Puducherry - 605013",
+    phone: "+91 99447 01436",
+    hours: "10:00 AM - 9:00 PM",
+    gstin: "",
+    facebook: "https://www.facebook.com/p/The-French-Mobiles-61558967133157/",
+    instagram: "https://www.instagram.com/the_french_mobiles",
+    whatsapp: "+91 99447 01436",
+    warranty_text: "Mobile handset & Chargers are warranted for the period defined by the respective manufacturers. We are not giving warranty and does not hold out any warranty of product sold. Physical and liquid damages will not be covered under warranty terms.",
+    user_notice: [
+      "Please inspect your device carefully when collecting it from our service center.",
+      "Physical and liquid damage will not be covered under warranty terms.",
+      "Please keep this receipt and present it when collecting your device.",
+      "We are not responsible for any data loss during repair."
+    ],
+    technician_label: "Repair Engineer",
+    footer_message: "Thank you for choosing The French Mobiles!"
+  })
+
+  useEffect(() => {
+    if (settings.shop_details) {
+      setShopForm(settings.shop_details)
+    }
+  }, [settings.shop_details])
+
+  const handleSaveShopDetails = async () => {
+    await updateSetting('shop_details', shopForm)
+    alert('Shop details saved!')
+  }
 
   if (userRole !== 'admin') {
     return <Navigate to="/dashboard" replace />
@@ -100,47 +132,44 @@ const SettingsPage = () => {
     }
   }
 
+  const defaultCategories = ["Display", "Camera", "Audio", "Connectivity", "Physical", "SIM", "Security"]
+  const categories = Array.from(new Set([
+    ...defaultCategories,
+    ...customCategories,
+    ...(settings.device_checklist?.[checklistTab] || []).map(item => item.category).filter(Boolean)
+  ]))
+
+  const filteredItemsWithIndex = (settings.device_checklist?.[checklistTab] || [])
+    .map((item, index) => ({ ...item, originalIndex: index }))
+    .filter(item => (item.category || 'Display') === selectedCategory)
+
   const handleAddChecklistItem = async () => {
     const label = newChecklistItem.label.trim()
-    if (!label || selectedChecklistCategory === null) return
-    
-    const categories = [...(settings.device_checklist?.categories || [])]
-    const category = { ...categories[selectedChecklistCategory] }
-    category.items = [...(category.items || []), { label, type: newChecklistItem.type }]
-    categories[selectedChecklistCategory] = category
-    
-    await updateSetting('device_checklist', { categories })
+    if (!label) return
+    const checklist = { ...(settings.device_checklist || {}) }
+    const tabItems = [...(checklist[checklistTab] || [])]
+    tabItems.push({ label, type: newChecklistItem.type, category: selectedCategory })
+    checklist[checklistTab] = tabItems
+    await updateSetting('device_checklist', checklist)
     setNewChecklistItem({ label: '', type: 'working_notworking' })
   }
 
-  const handleDeleteChecklistItem = async (catIndex, itemIndex) => {
-    const categories = [...(settings.device_checklist?.categories || [])]
-    const category = { ...categories[catIndex] }
-    category.items = category.items.filter((_, i) => i !== itemIndex)
-    categories[catIndex] = category
-    await updateSetting('device_checklist', { categories })
+  const handleDeleteChecklistItem = async (originalIndex) => {
+    const checklist = { ...(settings.device_checklist || {}) }
+    const tabItems = [...(checklist[checklistTab] || [])]
+    tabItems.splice(originalIndex, 1)
+    checklist[checklistTab] = tabItems
+    await updateSetting('device_checklist', checklist)
   }
 
-  const handleAddCategory = async () => {
-    const name = prompt('Enter category name:')
+  const handleAddCategory = () => {
+    const name = prompt('Enter new category name:')
     if (!name?.trim()) return
-    const categories = [...(settings.device_checklist?.categories || [])]
-    categories.push({ name: name.trim(), items: [] })
-    await updateSetting('device_checklist', { categories })
-    setSelectedChecklistCategory(categories.length - 1)
-  }
-
-  const handleDeleteChecklistCategory = async (index) => {
-    const categories = [...(settings.device_checklist?.categories || [])]
-    categories.splice(index, 1)
-    await updateSetting('device_checklist', { categories })
-    if (categories.length === 0) {
-      setSelectedChecklistCategory(null)
-    } else if (selectedChecklistCategory === index) {
-      setSelectedChecklistCategory(Math.max(0, index - 1))
-    } else if (selectedChecklistCategory > index) {
-      setSelectedChecklistCategory(prev => prev - 1)
+    const formattedName = name.trim()
+    if (!categories.includes(formattedName)) {
+      setCustomCategories(prev => [...prev, formattedName])
     }
+    setSelectedCategory(formattedName)
   }
 
   return (
@@ -153,6 +182,94 @@ const SettingsPage = () => {
       </div>
 
       <div className="px-4 py-4 space-y-4">
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-4 border-l-4 border-[#002395] pl-3">
+            <i className="fas fa-store mr-2"></i>Shop Details
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Shop Name</label>
+              <input type="text" value={shopForm.name}
+                onChange={e => setShopForm(prev => ({...prev, name: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <textarea value={shopForm.address} rows={3}
+                onChange={e => setShopForm(prev => ({...prev, address: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input type="text" value={shopForm.phone}
+                  onChange={e => setShopForm(prev => ({...prev, phone: e.target.value}))}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Business Hours</label>
+                <input type="text" value={shopForm.hours}
+                  onChange={e => setShopForm(prev => ({...prev, hours: e.target.value}))}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN (optional)</label>
+              <input type="text" value={shopForm.gstin}
+                onChange={e => setShopForm(prev => ({...prev, gstin: e.target.value}))}
+                placeholder="Enter GSTIN when available"
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+              <input type="text" value={shopForm.whatsapp}
+                onChange={e => setShopForm(prev => ({...prev, whatsapp: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
+              <input type="text" value={shopForm.facebook}
+                onChange={e => setShopForm(prev => ({...prev, facebook: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+              <input type="text" value={shopForm.instagram}
+                onChange={e => setShopForm(prev => ({...prev, instagram: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Warranty Text</label>
+              <textarea value={shopForm.warranty_text} rows={3}
+                onChange={e => setShopForm(prev => ({...prev, warranty_text: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Footer Message</label>
+              <input type="text" value={shopForm.footer_message}
+                onChange={e => setShopForm(prev => ({...prev, footer_message: e.target.value}))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#002395]"
+              />
+            </div>
+            <button
+              onClick={handleSaveShopDetails}
+              className="w-full bg-[#002395] text-white rounded-xl py-2.5 text-sm font-semibold"
+            >
+              Save Shop Details
+            </button>
+          </div>
+        </div>
+
         {sections.map(section => (
           <div key={section.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -260,96 +377,108 @@ const SettingsPage = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs font-bold text-[#002395] uppercase tracking-wide mb-3 border-l-4 border-[#002395] pl-3">
             <i className="fas fa-clipboard-list mr-2"></i>
-            Device Checklist Categories
+            Device Checklist
           </p>
 
-          {/* Category selector */}
+          <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide pb-2 border-b border-gray-100">
+            {['common', 'iphone', 'android'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setChecklistTab(tab)}
+                className={`flex-shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                  checklistTab === tab
+                    ? 'bg-[#002395] text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {tab === 'common' ? 'Common' :
+                 tab === 'iphone' ? (
+                   <><i className="fab fa-apple mr-1"></i>iPhone</>
+                 ) : (
+                   <><i className="fab fa-android mr-1"></i>Android</>
+                 )}
+              </button>
+            ))}
+          </div>
+
           <div className="mb-3">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 pl-1">
+              Select Category
+            </label>
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-              {(settings.device_checklist?.categories || []).map((cat, i) => (
-                <div key={i} className="relative group flex items-center">
-                  <button
-                    onClick={() => setSelectedChecklistCategory(i)}
-                    className={`flex items-center gap-2 whitespace-nowrap rounded-full text-xs font-semibold transition px-4 py-1.5 ${
-                      selectedChecklistCategory === i
-                        ? 'bg-[#002395] text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    type="button"
-                  >
-                    {cat.name}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteChecklistCategory(i)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full border border-gray-200 bg-white text-[#ED2939] text-[10px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                    aria-label={`Delete checklist category ${cat.name}`}
-                    type="button"
-                  >
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                    selectedCategory === cat
+                      ? 'bg-[#002395] text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {cat}
+                </button>
               ))}
               <button
                 onClick={handleAddCategory}
-                className="flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700"
+                className="flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 hover:bg-green-100"
               >
                 + Add Category
               </button>
             </div>
           </div>
 
-          {/* Items in selected category */}
-          {selectedChecklistCategory !== null && (
-            <>
-              <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
-                {(settings.device_checklist?.categories?.[selectedChecklistCategory]?.items || []).map((item, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                    <span className="flex-1 text-sm text-[#0f172a]">{item.label}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      item.type === 'yes_no'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {item.type === 'yes_no' ? 'Yes/No' : 'Working'}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteChecklistItem(selectedChecklistCategory, index)}
-                      className="text-[#ED2939] p-1"
-                    >
-                      <i className="fas fa-times text-xs"></i>
-                    </button>
-                  </div>
-                ))}
+          <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+            {filteredItemsWithIndex.map((item) => (
+              <div key={item.originalIndex} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <span className="flex-1 text-sm text-[#0f172a]">{item.label}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  item.type === 'yes_no'
+                    ? 'bg-orange-100 text-orange-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {item.type === 'yes_no' ? 'Yes/No' : 'Working'}
+                </span>
+                <button
+                  onClick={() => handleDeleteChecklistItem(item.originalIndex)}
+                  className="text-[#ED2939] p-1 hover:text-red-700"
+                >
+                  <i className="fas fa-times text-xs"></i>
+                </button>
               </div>
+            ))}
+            {filteredItemsWithIndex.length === 0 && (
+              <p className="text-gray-400 text-sm text-center py-3">No items in this category</p>
+            )}
+          </div>
 
-              {/* Add new item to category */}
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Item name e.g. Front Camera"
-                  value={newChecklistItem.label}
-                  onChange={e => setNewChecklistItem(prev => ({ ...prev, label: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
-                />
-                <div className="flex gap-2">
-                  <select
-                    value={newChecklistItem.type}
-                    onChange={e => setNewChecklistItem(prev => ({ ...prev, type: e.target.value }))}
-                    className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395] bg-white"
-                  >
-                    <option value="working_notworking">Working / Not Working</option>
-                    <option value="yes_no">Yes / No</option>
-                  </select>
-                  <button
-                    onClick={handleAddChecklistItem}
-                    className="bg-[#002395] text-white rounded-xl px-4 py-2 text-sm font-semibold"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          {/* Add new item to category */}
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder={`Item name for ${selectedCategory}...`}
+              value={newChecklistItem.label}
+              onChange={e => setNewChecklistItem(prev => ({ ...prev, label: e.target.value }))}
+              onKeyPress={e => e.key === 'Enter' && handleAddChecklistItem()}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395]"
+            />
+            <div className="flex gap-2">
+              <select
+                value={newChecklistItem.type}
+                onChange={e => setNewChecklistItem(prev => ({ ...prev, type: e.target.value }))}
+                className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#002395] bg-white"
+              >
+                <option value="working_notworking">Working / Not Working</option>
+                <option value="yes_no">Yes / No</option>
+              </select>
+              <button
+                onClick={handleAddChecklistItem}
+                className="bg-[#002395] text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-blue-800"
+              >
+                Add to {selectedCategory}
+              </button>
+            </div>
+          </div>
         </div>
 
         <button 

@@ -4,7 +4,7 @@ import { db } from '../firebase/firebase'
 
 const SettingsContext = createContext()
 
-const CACHE_KEY = 'fm_settings_cache'
+const CACHE_KEY = 'fm_settings_cache_v3'
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 const DEFAULT_SETTINGS = {
@@ -103,56 +103,71 @@ const DEFAULT_SETTINGS = {
   rom_options: {
     items: ["8GB", "16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB"]
   },
+  shop_details: {
+    name: "THE FRENCH MOBILES",
+    address: "225, Thiruvalluvar Salai, Iyyanar Nagar, Raja Nagar, Pudupalaiyam, Puducherry - 605013",
+    phone: "+91 99447 01436",
+    hours: "10:00 AM - 9:00 PM",
+    gstin: "",
+    facebook: "https://www.facebook.com/p/The-French-Mobiles-61558967133157/",
+    instagram: "https://www.instagram.com/the_french_mobiles",
+    whatsapp: "+91 99447 01436",
+    warranty_text: "Mobile handset & Chargers are warranted for the period defined by the respective manufacturers. We are not giving warranty and does not hold out any warranty of product sold. Physical and liquid damages will not be covered under warranty terms.",
+    user_notice: [
+      "Please inspect your device carefully when collecting it from our service center.",
+      "Physical and liquid damage will not be covered under warranty terms.",
+      "Please keep this receipt and present it when collecting your device.",
+      "We are not responsible for any data loss during repair."
+    ],
+    technician_label: "Repair Engineer",
+    footer_message: "Thank you for choosing The French Mobiles!"
+  },
   device_checklist: {
-    categories: [
-      {
-        name: "Display",
-        items: [
-          { label: "Display Clarity", type: "working_notworking" },
-          { label: "White Spots on Display", type: "yes_no" },
-          { label: "Display Replaced", type: "yes_no" }
-        ]
-      },
-      {
-        name: "Camera",
-        items: [
-          { label: "Front Camera (Clear dust)", type: "working_notworking" },
-          { label: "Rear Camera (Clear dust)", type: "working_notworking" }
-        ]
-      },
-      {
-        name: "Audio",
-        items: [
-          { label: "Earpiece Speaker", type: "working_notworking" },
-          { label: "Loudspeaker", type: "working_notworking" },
-          { label: "Microphone", type: "working_notworking" }
-        ]
-      },
-      {
-        name: "Connectivity",
-        items: [
-          { label: "Mobile Data", type: "working_notworking" },
-          { label: "Bluetooth", type: "working_notworking" },
-          { label: "Wi-Fi", type: "working_notworking" }
-        ]
-      },
-      {
-        name: "Physical",
-        items: [
-          { label: "Power Button", type: "working_notworking" },
-          { label: "Volume Buttons", type: "working_notworking" },
-          { label: "Proximity Sensor", type: "working_notworking" },
-          { label: "Flashlight", type: "working_notworking" },
-          { label: "Physical Damage / Bent", type: "yes_no" }
-        ]
-      },
-      {
-        name: "SIM",
-        items: [
-          { label: "SIM Slot 1", type: "working_notworking" },
-          { label: "SIM Slot 2", type: "working_notworking" }
-        ]
-      }
+    common: [
+      { label: "Display Clarity", type: "working_notworking", category: "Display" },
+      { label: "White Spots on Display", type: "yes_no", category: "Display" },
+      { label: "Display Replaced", type: "yes_no", category: "Display" },
+      { label: "Physical Damage / Bent", type: "yes_no", category: "Physical" }
+    ],
+    iphone: [
+      { label: "Face ID / Touch ID", type: "working_notworking", category: "Security" },
+      { label: "iCloud Lock Check", type: "yes_no", category: "Security" },
+      { label: "Battery Health %", type: "working_notworking", category: "Battery" },
+      { label: "True Tone Display", type: "working_notworking", category: "Display" },
+      { label: "Front Camera (Clear dust)", type: "working_notworking", category: "Camera" },
+      { label: "Rear Camera (Clear dust)", type: "working_notworking", category: "Camera" },
+      { label: "Earpiece Speaker", type: "working_notworking", category: "Audio" },
+      { label: "Loudspeaker", type: "working_notworking", category: "Audio" },
+      { label: "Microphone", type: "working_notworking", category: "Audio" },
+      { label: "Mobile Data", type: "working_notworking", category: "Connectivity" },
+      { label: "Bluetooth", type: "working_notworking", category: "Connectivity" },
+      { label: "Wi-Fi", type: "working_notworking", category: "Connectivity" },
+      { label: "Power Button", type: "working_notworking", category: "Physical" },
+      { label: "Volume Buttons", type: "working_notworking", category: "Physical" },
+      { label: "Mute Switch", type: "working_notworking", category: "Physical" },
+      { label: "Lightning / USB-C Port", type: "working_notworking", category: "Physical" },
+      { label: "SIM Slot", type: "working_notworking", category: "SIM" },
+      { label: "Flashlight", type: "working_notworking", category: "Physical" }
+    ],
+    android: [
+      { label: "Fingerprint Sensor", type: "working_notworking", category: "Security" },
+      { label: "Face Unlock", type: "working_notworking", category: "Security" },
+      { label: "Front Camera (Clear dust)", type: "working_notworking", category: "Camera" },
+      { label: "Rear Camera (Clear dust)", type: "working_notworking", category: "Camera" },
+      { label: "Earpiece Speaker", type: "working_notworking", category: "Audio" },
+      { label: "Loudspeaker", type: "working_notworking", category: "Audio" },
+      { label: "Microphone", type: "working_notworking", category: "Audio" },
+      { label: "Mobile Data", type: "working_notworking", category: "Connectivity" },
+      { label: "Bluetooth", type: "working_notworking", category: "Connectivity" },
+      { label: "Wi-Fi", type: "working_notworking", category: "Connectivity" },
+      { label: "Power Button", type: "working_notworking", category: "Physical" },
+      { label: "Volume Buttons", type: "working_notworking", category: "Physical" },
+      { label: "Charging Port", type: "working_notworking", category: "Physical" },
+      { label: "SIM Slot 1", type: "working_notworking", category: "SIM" },
+      { label: "SIM Slot 2", type: "working_notworking", category: "SIM" },
+      { label: "SD Card Slot", type: "working_notworking", category: "SIM" },
+      { label: "Flashlight", type: "working_notworking", category: "Physical" },
+      { label: "Proximity Sensor", type: "working_notworking", category: "Physical" }
     ]
   }
 }
@@ -178,7 +193,7 @@ export const SettingsProvider = ({ children }) => {
         }
       }
 
-      const keys = ['complaint_types', 'pre_delivery_checklist', 'brands', 'accessories', 'models', 'ram_options', 'rom_options', 'device_checklist']
+      const keys = ['complaint_types', 'pre_delivery_checklist', 'brands', 'accessories', 'models', 'ram_options', 'rom_options', 'device_checklist', 'shop_details']
       const docs = await Promise.all(
         keys.map(key => getDoc(doc(db, 'settings', key)))
       )
@@ -189,11 +204,7 @@ export const SettingsProvider = ({ children }) => {
       docs.forEach((docSnap, i) => {
         const key = keys[i]
         if (docSnap.exists()) {
-          if (key === 'device_checklist') {
-            newSettings[key] = docSnap.data()
-          } else {
-            newSettings[key] = docSnap.data()
-          }
+          newSettings[key] = docSnap.data()
         } else {
           newSettings[key] = DEFAULT_SETTINGS[key]
           missingKeys.push(key)
@@ -226,10 +237,12 @@ export const SettingsProvider = ({ children }) => {
         await setDoc(doc(db, 'settings', key), items)
       } else if (key === 'device_checklist') {
         await setDoc(doc(db, 'settings', key), items)
+      } else if (key === 'shop_details') {
+        await setDoc(doc(db, 'settings', key), items)
       } else {
         await setDoc(doc(db, 'settings', key), { items })
       }
-      const newSettings = { ...settings, [key]: key === 'models' || key === 'device_checklist' ? items : { items } }
+      const newSettings = { ...settings, [key]: key === 'models' || key === 'device_checklist' || key === 'shop_details' ? items : { items } }
       setSettings(newSettings)
       localStorage.setItem(CACHE_KEY, JSON.stringify({
         data: newSettings,
@@ -253,6 +266,7 @@ export const SettingsProvider = ({ children }) => {
         loading,
         updateSetting,
         clearCache,
+        shopDetails: settings.shop_details || DEFAULT_SETTINGS.shop_details,
         complaintTypes: settings.complaint_types?.items || [],
         preDeliveryChecklist: settings.pre_delivery_checklist?.items || [],
         brands: settings.brands?.items || [],
@@ -260,7 +274,7 @@ export const SettingsProvider = ({ children }) => {
         models: settings.models || {},
         ramOptions: settings.ram_options?.items || ["2GB", "3GB", "4GB", "6GB", "8GB", "12GB", "16GB"],
         romOptions: settings.rom_options?.items || ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB"],
-        deviceChecklist: settings.device_checklist?.categories || []
+        deviceChecklist: settings.device_checklist || { common: [], iphone: [], android: [] }
       }}
     >
       {children}
@@ -269,3 +283,22 @@ export const SettingsProvider = ({ children }) => {
 }
 
 export const useSettings = () => useContext(SettingsContext)
+
+export function normalizeChecklistItems(checklist, brand) {
+  if (!checklist) return []
+  if (Array.isArray(checklist)) return checklist.flatMap(c => c.items || [])
+  if ('common' in checklist || 'iphone' in checklist || 'android' in checklist) {
+    const isApple = brand?.toLowerCase() === 'apple'
+    const common = checklist.common || []
+    const specific = isApple ? (checklist.iphone || []) : (checklist.android || [])
+    return [...common, ...specific]
+  }
+  if (checklist.categories) return checklist.categories.flatMap(c => c.items || [])
+  return Object.values(checklist).flat()
+}
+
+export function isBrandBasedChecklist(checklist) {
+  if (!checklist) return false
+  if (Array.isArray(checklist)) return false
+  return 'common' in checklist || 'iphone' in checklist || 'android' in checklist
+}

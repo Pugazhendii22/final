@@ -1,102 +1,281 @@
-import { jsPDF } from 'jspdf';
-import { createRoot } from 'react-dom/client';
-import LabelPrint from '../components/labels/LabelPrint';
+import JsBarcode from 'jsbarcode'
+import { printLabelQZ } from './qzPrint'
 
-let isPrinting = false;
+let isPrinting = false
 
-export const printLabel = async (labelData) => {
-  if (isPrinting) return;
-  isPrinting = true;
+export const generateLabelHTML = (labelData) => {
+  const type = labelData?.labelType
+  const data = labelData?.data || {}
+  const labelNumber = labelData?.labelNumber || ''
+
+  const barcodeCanvas = document.createElement('canvas')
+  const barcodeValue = labelNumber
+    ? String(labelNumber)
+    : data.imei1 || data.orderNumber || data.sku || '26000'
 
   try {
-    // Create PDF at exact 50mm x 25mm
-    const pdf = new jsPDF({
-      unit: 'mm',
-      format: [50, 25],
-      orientation: 'landscape'
-    });
+    JsBarcode(barcodeCanvas, barcodeValue, {
+      format: 'CODE128',
+      width: 2,
+      height: 60,
+      displayValue: false,
+      margin: 0,
+      background: '#ffffff',
+      lineColor: '#000000'
+    })
+  } catch (e) {
+    console.error('Barcode error:', e)
+  }
 
-    // Verify PDF page size
-    console.log('PDF page size (mm):', pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+  const barcodeDataUrl = barcodeCanvas.toDataURL('image/png')
 
-    // Render label to hidden div first to get content
-    const printDiv = document.createElement('div');
-    printDiv.id = 'print-label-temp';
-    printDiv.style.cssText = `
-      position: fixed;
-      top: -9999px;
-      left: -9999px;
-      width: 189px;
-      height: 95px;
-      background: white;
-      overflow: hidden;
-    `;
-    document.body.appendChild(printDiv);
+  let contentHTML = ''
+  if (type === 'second_hand') {
+    contentHTML = `
+      <div class="shop-name">THE FRENCH MOBILES</div>
+      <hr/>
+      <div class="main-text">${data.brand || ''} ${data.model || ''}</div>
+      <div class="sub-text">${data.ram || ''} RAM · ${data.rom || ''} ROM · Grade ${data.grade || ''}</div>
+      <div class="price">Rs.${data.salePrice || ''}</div>
+      <img class="barcode" src="${barcodeDataUrl}" />
+      <div class="label-num">#${labelNumber}${data.imei1 ? ' · IMEI: ' + data.imei1 : ''}</div>
+    `
+  } else if (type === 'service_order') {
+    contentHTML = `
+      <div class="shop-name">THE FRENCH MOBILES</div>
+      <hr/>
+      <div class="main-text">${data.customerName || ''}</div>
+      <div class="sub-text">${data.brand || ''} ${data.model || ''}</div>
+      <div class="sub-text">${data.complaintTypes?.[0] || ''}</div>
+      <div class="price">Est: Rs.${data.estimatedPrice || ''}</div>
+      <img class="barcode" src="${barcodeDataUrl}" />
+      <div class="label-num">#${labelNumber} · ${data.orderNumber || ''}</div>
+    `
+  } else if (type === 'product') {
+    contentHTML = `
+      <div class="shop-name">THE FRENCH MOBILES</div>
+      <hr/>
+      <div class="main-text">${data.productName || ''}</div>
+      <div class="sub-text">${data.brand || ''} · ${data.category || ''}</div>
+      <div class="price">Rs.${data.salePrice || ''}</div>
+      <img class="barcode" src="${barcodeDataUrl}" />
+      <div class="label-num">#${labelNumber}${data.sku ? ' · ' + data.sku : ''}</div>
+    `
+  }
 
-    const root = createRoot(printDiv);
-    root.render(<LabelPrint labelData={labelData} />);
+  const css = `
+    @page { size: 50mm 25mm; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 50mm; height: 25mm; overflow: hidden; background: white; }
+    .label { width: 50mm; height: 25mm; padding: 0.5mm 1mm; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5mm; font-family: Arial, sans-serif; overflow: hidden; }
+    .shop-name { font-size: 7pt; font-weight: bold; letter-spacing: 0.5pt; text-align: center; width: 100%; line-height: 1.1; }
+    hr { width: 100%; border: none; border-top: 0.3pt solid black; margin: 0; }
+    .main-text { font-size: 8pt; font-weight: bold; text-align: center; width: 100%; line-height: 1.1; }
+    .sub-text { font-size: 6pt; text-align: center; color: #333; width: 100%; line-height: 1.1; }
+    .price { font-size: 9pt; font-weight: bold; text-align: center; line-height: 1.1; }
+    .barcode { width: 48mm; height: 6mm; display: block; }
+    .label-num { font-size: 5pt; color: #555; text-align: center; width: 100%; line-height: 1.1; }
+  `
 
-    // Wait for barcode to render
-    await new Promise(resolve => {
-      let attempts = 0;
-      const check = () => {
-        attempts++;
-        const svg = printDiv.querySelector('svg');
-        const hasContent = svg && svg.children.length > 3;
-        if (hasContent) {
-          setTimeout(resolve, 400);
-        } else if (attempts >= 20) {
-          resolve();
-        } else {
-          setTimeout(check, 150);
-        }
-      };
-      setTimeout(check, 200);
-    });
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>${css}</style>
+    </head>
+    <body>
+      <div class="label">${contentHTML}</div>
+    </body>
+    </html>
+  `
+}
 
-    // Use html2canvas to capture the rendered label
-    const { default: html2canvas } = await import('html2canvas');
-    const canvas = await html2canvas(printDiv, {
-      scale: 10,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      width: 189,
-      height: 95,
-      windowWidth: 189,
-      windowHeight: 95,
-      scrollX: 0,
-      scrollY: 0
-    });
+export const printLabel = async (labelData) => {
+  if (isPrinting) return
+  isPrinting = true
 
-    const imgData = canvas.toDataURL('image/png');
+  try {
+    const type = labelData?.labelType
+    const data = labelData?.data || {}
+    const labelNumber = labelData?.labelNumber || ''
 
-    // Add image to PDF at exact size
-    pdf.addImage(imgData, 'PNG', 0, 0, 50, 25);
+    console.log('Printing label type:', type, 'number:', labelNumber)
 
-    // Open PDF in new tab for printing
-    // This auto-sets paper size to 50x25mm
-    const pdfBlob = pdf.output('blob');
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    const printWindow = window.open(pdfUrl, '_blank');
+    // Generate barcode canvas
+    const barcodeCanvas = document.createElement('canvas')
+    const barcodeValue = labelNumber
+      ? String(labelNumber)
+      : data.imei1 || data.orderNumber || data.sku || '26000'
 
-    if (printWindow) {
-      printWindow.addEventListener('load', () => {
-        printWindow.document.title = 'French Mobiles Label';
-        setTimeout(() => {
-          printWindow.print();
-        }, 800);
-      });
+    try {
+      JsBarcode(barcodeCanvas, barcodeValue, {
+        format: 'CODE128',
+        width: 2,
+        height: 60,
+        displayValue: false,
+        margin: 0,
+        background: '#ffffff',
+        lineColor: '#000000'
+      })
+    } catch (e) {
+      console.error('Barcode error:', e)
     }
 
-    // Cleanup
-    root.unmount();
-    printDiv.remove();
-    URL.revokeObjectURL(pdfUrl);
+    const barcodeDataUrl = barcodeCanvas.toDataURL('image/png')
+
+    // Build label HTML based on type
+    let contentHTML = ''
+
+    if (type === 'second_hand') {
+      contentHTML = `
+        <div class="shop-name">THE FRENCH MOBILES</div>
+        <hr/>
+        <div class="main-text">${data.brand || ''} ${data.model || ''}</div>
+        <div class="sub-text">${data.ram || ''} RAM · ${data.rom || ''} ROM · Grade ${data.grade || ''}</div>
+        <div class="price">Rs.${data.salePrice || ''}</div>
+        <img class="barcode" src="${barcodeDataUrl}" />
+        <div class="label-num">#${labelNumber}${data.imei1 ? ' · IMEI: ' + data.imei1 : ''}</div>
+      `
+    } else if (type === 'service_order') {
+      contentHTML = `
+        <div class="shop-name">THE FRENCH MOBILES</div>
+        <hr/>
+        <div class="main-text">${data.customerName || ''}</div>
+        <div class="sub-text">${data.brand || ''} ${data.model || ''}</div>
+        <div class="sub-text">${data.complaintTypes?.[0] || ''}</div>
+        <div class="price">Est: Rs.${data.estimatedPrice || ''}</div>
+        <img class="barcode" src="${barcodeDataUrl}" />
+        <div class="label-num">#${labelNumber} · ${data.orderNumber || ''}</div>
+      `
+    } else if (type === 'product') {
+      contentHTML = `
+        <div class="shop-name">THE FRENCH MOBILES</div>
+        <hr/>
+        <div class="main-text">${data.productName || ''}</div>
+        <div class="sub-text">${data.brand || ''} · ${data.category || ''}</div>
+        <div class="price">Rs.${data.salePrice || ''}</div>
+        <img class="barcode" src="${barcodeDataUrl}" />
+        <div class="label-num">#${labelNumber}${data.sku ? ' · ' + data.sku : ''}</div>
+      `
+    } else {
+      contentHTML = `
+        <div class="shop-name">THE FRENCH MOBILES</div>
+        <div class="main-text">Label #${labelNumber}</div>
+        <img class="barcode" src="${barcodeDataUrl}" />
+      `
+    }
+
+    // Create print window
+    const printWindow = window.open('', '_blank', 'width=300,height=200')
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          @page {
+            size: 50mm 25mm;
+            margin: 0;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          html, body {
+            width: 50mm;
+            height: 25mm;
+            overflow: hidden;
+            background: white;
+          }
+          .label {
+            width: 50mm;
+            height: 25mm;
+            padding: 0.5mm 1mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5mm;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+          }
+          .shop-name {
+            font-size: 7pt;
+            font-weight: bold;
+            letter-spacing: 0.5pt;
+            text-align: center;
+            width: 100%;
+            line-height: 1.1;
+          }
+          hr {
+            width: 100%;
+            border: none;
+            border-top: 0.3pt solid black;
+            margin: 0;
+          }
+          .main-text {
+            font-size: 8pt;
+            font-weight: bold;
+            text-align: center;
+            width: 100%;
+            line-height: 1.1;
+          }
+          .sub-text {
+            font-size: 6pt;
+            text-align: center;
+            color: #333;
+            width: 100%;
+            line-height: 1.1;
+          }
+          .price {
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.1;
+          }
+          .barcode {
+            width: 48mm;
+            height: 6mm;
+            display: block;
+          }
+          .label-num {
+            font-size: 5pt;
+            color: #555;
+            text-align: center;
+            width: 100%;
+            line-height: 1.1;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          ${contentHTML}
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print()
+              setTimeout(function() {
+                window.close()
+              }, 2000)
+            }, 300)
+          }
+        </script>
+      </body>
+      </html>
+    `)
+
+    printWindow.document.close()
 
   } catch (error) {
-    console.error('Print error:', error);
-    alert('Print failed. Please try again.');
+    console.error('Print error:', error)
+    alert('Print failed: ' + error.message)
   } finally {
-    isPrinting = false;
+    setTimeout(() => {
+      isPrinting = false
+    }, 3000)
   }
-};
+}
